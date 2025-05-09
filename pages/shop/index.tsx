@@ -444,24 +444,25 @@ const Shop = () => {
   // Модифицируем функцию handleOpenCase
   const handleOpenCase = async () => {
     try {
-      setShowCaseOpening(true);
-      startNftScrolling();
-
+      // 1. Сначала получаем NFT с бекенда
       const response = await axios.post(`${backUrl}/openCase`, {
         username: userInfo.username,
       });
 
       if (response.data && response.data.nft) {
-        setSelectedNft(response.data.nft);
+        const receivedNft = response.data.nft;
+
+        // 2. Начинаем анимацию прокрутки с известным NFT
+        startNftScrolling(receivedNft);
+
+        // 3. Обновляем состояние пользователя
         setUserInfo({
           ...userInfo,
           cases: response.data.remainingCases,
         });
-        // Обновляем список NFT пользователя
+
+        // 4. Обновляем список NFT пользователя
         await fetchUserNfts();
-      } else {
-        const randomIndex = Math.floor(Math.random() * possibleNfts.length);
-        setSelectedNft(possibleNfts[randomIndex]);
       }
     } catch (error) {
       console.error("Ошибка при открытии кейса:", error);
@@ -470,45 +471,47 @@ const Shop = () => {
     }
   };
 
-  const startNftScrolling = () => {
+  const startNftScrolling = (targetNft) => {
+    setShowCaseOpening(true);
     setCaseAnimationStage(1);
 
-    // Настройки анимации
-    const settings = {
-      cycles: 5, // Увеличили количество прокруток
-      startSpeed: 100, // Начальная скорость
-      minSpeed: 50, // Минимальная скорость (максимальная быстрота)
-      maxSpeed: 400, // Максимальная скорость (медленнее)
-      slowDownPoint: 0.7, // Когда начинать замедление (70% прокруток)
-    };
+    // Находим индекс целевого NFT в possibleNfts
+    const targetIndex = possibleNfts.findIndex(
+      (nft) => nft._id === targetNft._id
+    );
 
-    // Создаем длинный массив для прокрутки
-    const fullScrollArray = [
-      ...Array(settings.cycles).fill(possibleNfts),
-    ].flat();
-    setScrollingNfts(fullScrollArray);
+    // Создаем массив для прокрутки, который заканчивается на целевом NFT
+    const scrollArray = [
+      ...possibleNfts.slice(targetIndex), // NFT от целевого до конца
+      ...possibleNfts, // Полный список
+      ...possibleNfts, // Еще раз полный список
+      targetNft, // Завершаем на целевом NFT
+    ];
+
+    setScrollingNfts(scrollArray);
     setCurrentScrollingIndex(0);
 
-    let speed = settings.startSpeed;
-    const totalItems = fullScrollArray.length;
-    const slowDownThreshold = Math.floor(totalItems * settings.slowDownPoint);
+    // Настройки анимации
+    let speed = 100; // Начальная скорость
+    const minSpeed = 50;
+    const maxSpeed = 400;
+    const slowDownPoint = Math.floor(scrollArray.length * 0.7);
 
     const scroll = () => {
       setCurrentScrollingIndex((prev) => {
         const nextIndex = prev + 1;
 
         // Замедление при приближении к концу
-        if (nextIndex > slowDownThreshold) {
-          speed = Math.min(speed + 20, settings.maxSpeed);
+        if (nextIndex > slowDownPoint) {
+          speed = Math.min(speed + 20, maxSpeed);
           clearInterval(scrollIntervalRef.current);
           scrollIntervalRef.current = setInterval(scroll, speed);
         }
 
         // Остановка в конце
-        if (nextIndex >= totalItems) {
+        if (nextIndex >= scrollArray.length - 1) {
           clearInterval(scrollIntervalRef.current);
-          const randomIndex = Math.floor(Math.random() * possibleNfts.length);
-          setSelectedNft(possibleNfts[randomIndex]);
+          setSelectedNft(targetNft);
           setCaseAnimationStage(2);
           return prev;
         }
@@ -520,8 +523,8 @@ const Shop = () => {
 
     // Ускорение в начале
     const accelerate = setInterval(() => {
-      if (speed > settings.minSpeed) {
-        speed = Math.max(speed - 10, settings.minSpeed);
+      if (speed > minSpeed) {
+        speed = Math.max(speed - 10, minSpeed);
         clearInterval(scrollIntervalRef.current);
         scrollIntervalRef.current = setInterval(scroll, speed);
       } else {
