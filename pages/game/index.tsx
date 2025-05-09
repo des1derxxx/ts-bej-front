@@ -920,7 +920,7 @@ const GamePage = () => {
                       ? "opacity-0"
                       : "opacity-100"
                   }
-                  ${gem.matched ? "opacity-30" : ""}
+                  ${gem.matched ? "animate-pop-out" : ""}
                   ${bombSelected ? "hover:ring-2 hover:ring-red-500" : ""}
                   ${targetGem?.id === gem.id ? "ring-2 ring-yellow-400" : ""}`}
                 onMouseDown={(e) => handleDragStart(e, rowIndex, colIndex)}
