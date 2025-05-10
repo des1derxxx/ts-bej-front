@@ -121,8 +121,8 @@ const BejeweledMenu = () => {
     { id: "play", label: "Играть", icon: "▶️", path: "/game" },
     { id: "levels", label: "Уровни", icon: "🎮", path: "/levels" },
     { id: "shop", label: "Магазин", icon: "🛒", path: "/shop" },
-    { id: "settings", label: "Настройки", icon: "⚙️", path: "/settings" },
-    { id: "leaderboard", label: "Рекорды", icon: "🏆" },
+    { id: "awards", label: "Награды", icon: "⚙️", path: "/awards" },
+    //{ id: "leaderboard", label: "Рекорды", icon: "🏆" },
   ];
 
   // Эффект мерцания для кнопок
