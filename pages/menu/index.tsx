@@ -2,12 +2,31 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import TelegramWebApp from "../../TelegramWebApp";
 
+interface Gem {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  speed: number;
+  rotation: number;
+  rotationSpeed: number;
+}
+
+interface MenuOption {
+  id: string;
+  label: string;
+  icon: string;
+  path?: string;
+}
+
 const BejeweledMenu = () => {
-  const [selectedOption, setSelectedOption] = useState(null);
-  const [gems, setGems] = useState([]);
-  const [animationFrame, setAnimationFrame] = useState(0);
-  const [fadeOut, setFadeOut] = useState(false);
-  const [userName, setUserName] = useState(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [gems, setGems] = useState<Gem[]>([]);
+  const [animationFrame, setAnimationFrame] = useState<number>(0);
+  const [fadeOut, setFadeOut] = useState<boolean>(false);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -25,7 +44,7 @@ const BejeweledMenu = () => {
   // Предотвращение прокрутки
   useEffect(() => {
     // Функция для предотвращения прокрутки
-    const preventDefault = (e) => {
+    const preventDefault = (e: Event) => {
       e.preventDefault();
     };
 
@@ -55,7 +74,7 @@ const BejeweledMenu = () => {
   // Создаем фоновую анимацию с падающими камнями
   useEffect(() => {
     const createGems = () => {
-      const newGems = [];
+      const newGems: Gem[] = [];
       for (let i = 0; i < 20; i++) {
         newGems.push({
           id: i,
@@ -98,7 +117,7 @@ const BejeweledMenu = () => {
     };
   }, []);
 
-  const menuOptions = [
+  const menuOptions: MenuOption[] = [
     { id: "play", label: "Играть", icon: "▶️", path: "/game" },
     { id: "levels", label: "Уровни", icon: "🎮", path: "/levels" },
     { id: "shop", label: "Магазин", icon: "🛒", path: "/shop" },
@@ -107,7 +126,7 @@ const BejeweledMenu = () => {
   ];
 
   // Эффект мерцания для кнопок
-  const [glowIntensity, setGlowIntensity] = useState(0);
+  const [glowIntensity, setGlowIntensity] = useState<number>(0);
   useEffect(() => {
     const glowInterval = setInterval(() => {
       setGlowIntensity((prev) => (prev + 0.1) % 1);
@@ -116,7 +135,9 @@ const BejeweledMenu = () => {
     return () => clearInterval(glowInterval);
   }, []);
 
-  const handleClick = (path) => {
+  const handleClick = (path?: string) => {
+    if (!path) return;
+
     setFadeOut(true);
     setTimeout(() => {
       router.push(path);
@@ -125,19 +146,29 @@ const BejeweledMenu = () => {
 
   // Получение имени пользователя из Telegram WebApp
   useEffect(() => {
-    // Убедимся, что объект Telegram WebApp доступен
-    if (window.Telegram && window.Telegram.WebApp) {
-      const tg = window.Telegram.WebApp;
+    try {
+      // Убедимся, что объект Telegram WebApp доступен
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg) {
+        // Отключаем вертикальные свайпы для предотвращения закрытия и прокрутки
+        if (typeof tg.disableVerticalSwipes === "function") {
+          tg.disableVerticalSwipes();
+        }
 
-      // Отключаем вертикальные свайпы для предотвращения закрытия и прокрутки
-      if (typeof tg.disableVerticalSwipes === "function") {
-        tg.disableVerticalSwipes();
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+          setUserName(user.first_name || null);
+        } else {
+          setError("Не удалось получить данные пользователя");
+        }
+      } else {
+        setError("Telegram WebApp не доступен");
       }
-
-      const user = tg.initDataUnsafe?.user;
-      if (user) {
-        setUserName(user.first_name); // Извлекаем имя пользователя
-      }
+    } catch (error) {
+      console.error("Ошибка при инициализации Telegram WebApp:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      setError(`Ошибка при инициализации: ${errorMessage}`);
     }
   }, []);
 
@@ -169,6 +200,7 @@ const BejeweledMenu = () => {
           <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-300 drop-shadow-lg">
             BEJEWELED {userName ? `- Привет, ${userName}` : ""}
           </h1>
+          {error && <p className="text-red-400 mt-2 text-sm">{error}</p>}
         </div>
 
         {/* Меню опций */}
@@ -177,11 +209,11 @@ const BejeweledMenu = () => {
             <button
               key={option.id}
               className={`relative flex items-center py-4 px-6 rounded-lg text-xl font-bold transition-all duration-300 
-    ${
-      selectedOption === option.id
-        ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white scale-105"
-        : "bg-gradient-to-r from-indigo-700 to-purple-800 text-white hover:scale-105"
-    } shadow-lg`}
+                ${
+                  selectedOption === option.id
+                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white scale-105"
+                    : "bg-gradient-to-r from-indigo-700 to-purple-800 text-white hover:scale-105"
+                } shadow-lg`}
               style={{
                 boxShadow: `0 0 ${
                   10 + Math.sin(glowIntensity * Math.PI * 2) * 10
