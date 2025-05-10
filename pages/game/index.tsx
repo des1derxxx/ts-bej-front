@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
-// Объявление типов для состояний
-
+// Интерфейсы для типизации
 interface BackgroundGem {
   id: string;
   x: number;
@@ -24,9 +23,51 @@ interface Gem {
   matched?: boolean;
 }
 
+interface GemType {
+  type: string;
+  image: string;
+}
+
+interface DragPosition {
+  x: number;
+  y: number;
+}
+
+interface TouchStart {
+  x: number;
+  y: number;
+  time: number;
+}
+
+// Интерфейс для типизации данных пользователя Telegram
+interface TelegramWebAppUser {
+  username?: string;
+  first_name?: string;
+  id?: number;
+}
+
 const BACK_URL = process.env.NEXT_PUBLIC_BACK_URL;
 
-const createBackgroundGem = (id: number) => {
+// Функция для безопасного получения данных пользователя из Telegram WebApp
+const getTelegramUser = () => {
+  try {
+    const webApp = (window as any).Telegram?.WebApp;
+    if (!webApp) return null;
+
+    const user = webApp.initDataUnsafe?.user;
+    if (!user) return null;
+
+    return {
+      username: user.username,
+      first_name: user.first_name,
+      id: user.id,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const createBackgroundGem = (id: number): BackgroundGem => {
   const gemTypes = [
     "red",
     "blue",
@@ -48,34 +89,108 @@ const createBackgroundGem = (id: number) => {
   };
 };
 
-const GamePage = () => {
+const GamePage: React.FC = () => {
   const router = useRouter();
   const [grid, setGrid] = useState<Gem[][]>([]);
-  const [score, setScore] = useState(0);
-  const [isSwapping, setIsSwapping] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [score, setScore] = useState<number>(0);
+  const [isSwapping, setIsSwapping] = useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = useState<number>(60);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [draggedGem, setDraggedGem] = useState<Gem | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const gridRef = useRef(null);
-  const [cellSize, setCellSize] = useState(56); // Default size, will be updated based on screen size
+  const [dragOffset, setDragOffset] = useState<DragPosition>({ x: 0, y: 0 });
+  const [dragPosition, setDragPosition] = useState<DragPosition>({
+    x: 0,
+    y: 0,
+  });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [cellSize, setCellSize] = useState<number>(56);
   const [backgroundGems, setBackgroundGems] = useState<BackgroundGem[]>([]);
-  const [bombSelected, setBombSelected] = useState(false);
-  const [bombsLeft, setBombsLeft] = useState(100); // Начальное количество бомб
-  const [isMixing, setIsMixing] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [mixesLeft, setMixesLeft] = useState(3); // Начальное количество миксов
+  const [bombSelected, setBombSelected] = useState<boolean>(false);
+  const [bombsLeft, setBombsLeft] = useState<number>(100);
+  const [isMixing, setIsMixing] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [mixesLeft, setMixesLeft] = useState<number>(3);
   const [targetGem, setTargetGem] = useState<Gem | null>(null);
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(
-    null
-  );
-  const scoreRef = useRef(score);
-  const [gameOver, setGameOver] = useState(false);
-  // const [levelNumber, setLevelNumber] = useState(1);
-  const [sendingResults, setSendingResults] = useState(false);
-  const [resultSent, setResultSent] = useState(false);
+  const touchStartRef = useRef<TouchStart | null>(null);
+  const scoreRef = useRef<number>(score);
+  const [gameOver, setGameOver] = useState<boolean>(false);
+  const [sendingResults, setSendingResults] = useState<boolean>(false);
+  const [resultSent, setResultSent] = useState<boolean>(false);
+  const bgAnimationRef = useRef<number | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isBrowser, setIsBrowser] = useState<boolean>(false);
+
+  // Проверяем, находимся ли мы в браузере
+  useEffect(() => {
+    setIsBrowser(typeof window !== "undefined");
+  }, []);
+
+  // Функция для получения информации о пользователе
+  const fetchUserInfo = async (username: string) => {
+    try {
+      setLoading(true);
+      setDebugInfo(`Attempting to fetch data for user: ${username}`);
+
+      const response = await axios.post(`${BACK_URL}/getUserInf`, {
+        username: username,
+      });
+
+      if (response.data && response.data.user) {
+        // Обновляем состояние игры на основе полученных данных
+        setBombsLeft(response.data.user.bombs || 100);
+        setMixesLeft(response.data.user.mix || 3);
+        setDebugInfo(
+          `Data loaded successfully: ${JSON.stringify(response.data.user)}`
+        );
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+      setDebugInfo(
+        `Error fetching user info: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+      setError("Не удалось загрузить информацию о пользователе");
+      setLoading(false);
+    }
+  };
+
+  // Типизированные константы
+  const gemTypes: GemType[] = [
+    { type: "red", image: "/img/avalanche.png" },
+    { type: "blue", image: "/img/eth.png" },
+    { type: "green", image: "/img/usdt.png" },
+    { type: "yellow", image: "/img/doge.png" },
+    { type: "purple", image: "/img/bnb.png" },
+    { type: "pink", image: "/img/sol.png" },
+    { type: "orange", image: "/img/btc.png" },
+  ];
+
+  const gemImages: Record<string, string> = {
+    red: "/img/avalanche.png",
+    blue: "/img/eth.png",
+    green: "/img/usdt.png",
+    yellow: "/img/doge.png",
+    purple: "/img/sol.png",
+    pink: "/img/bnb.png",
+    orange: "/img/btc.png",
+  };
+
+  const gemColors: Record<string, string> = {
+    red: "#f87171",
+    blue: "#60a5fa",
+    green: "#4ade80",
+    yellow: "#fbbf24",
+    purple: "#a78bfa",
+    pink: "#fb923c",
+    orange: "#fb923c",
+  };
 
   // Добавление типов для переменных
   let positions: { row: number; col: number }[] = [];
@@ -89,39 +204,6 @@ const GamePage = () => {
   useEffect(() => {
     scoreRef.current = score; // Обновляем ref при каждом изменении score
   }, [score]);
-
-  // Типы кристаллов с ссылками на изображения
-  const gemTypes = [
-    { type: "red", image: "/img/avalanche.png" },
-    { type: "blue", image: "/img/eth.png" },
-    { type: "green", image: "/img/usdt.png" },
-    { type: "yellow", image: "/img/doge.png" },
-    { type: "purple", image: "/img/bnb.png" },
-    { type: "pink", image: "/img/sol.png" },
-    { type: "orange", image: "/img/btc.png" },
-  ];
-
-  // Используем заглушки для изображений, т.к. реальные изображения недоступны
-  const gemImages: Record<string, string> = {
-    red: "/img/avalanche.png",
-    blue: "/img/eth.png",
-    green: "/img/usdt.png",
-    yellow: "/img/doge.png",
-    purple: "/img/sol.png",
-    pink: "/img/bnb.png",
-    orange: "/img/btc.png",
-  };
-
-  // Цвета для заглушек
-  const gemColors: Record<string, string> = {
-    red: "#f87171",
-    blue: "#60a5fa",
-    green: "#4ade80",
-    yellow: "#fbbf24",
-    purple: "#a78bfa",
-    pink: "#fb923c",
-    orange: "#fb923c",
-  };
 
   // Инициализация игры
   useEffect(() => {
@@ -196,9 +278,6 @@ const GamePage = () => {
       }
     };
   };
-
-  // Добавьте эту ссылку в компоненте
-  const bgAnimationRef = useRef<number | null>(null);
 
   // Единая обработка таймера
   useEffect(() => {
@@ -669,24 +748,30 @@ const GamePage = () => {
     sendLevelResults();
   };
 
-  // Функция отправки результатов на сервер
-  const sendLevelResults = async () => {
+  // Улучшенная обработка ошибок при отправке результатов
+  const sendLevelResults = async (): Promise<void> => {
     const { level } = router.query;
     const levelToSend = Number(level);
     const currentScore = scoreRef.current;
 
+    if (!level || isNaN(levelToSend)) {
+      console.error("Invalid level number");
+      alert("Ошибка: неверный номер уровня");
+      return;
+    }
+
     try {
       setSendingResults(true);
-      const tg = window.Telegram?.WebApp;
-      const userData = tg?.initDataUnsafe?.user;
-      const username = userData.username;
 
-      console.log("Sending score:", currentScore);
+      const user = getTelegramUser();
+      if (!user?.username) {
+        throw new Error("Не удалось получить данные пользователя Telegram");
+      }
 
       const response = await axios.post(
         `${BACK_URL}/updateLevelProgress`,
         {
-          username,
+          username: user.username,
           levelNumber: levelToSend,
           score: currentScore,
         },
@@ -696,23 +781,27 @@ const GamePage = () => {
           },
         }
       );
-      console.log("Sending data:", username, levelToSend, currentScore);
 
       if (response.status === 200) {
         setResultSent(true);
         setTimeout(() => router.push("/menu"), 500);
       } else {
-        console.error("Server responded with:", response.status, response.data);
-        alert(
-          `Failed to save results: ${response.data.message || "Unknown error"}`
-        );
+        throw new Error(`Сервер вернул статус: ${response.status}`);
       }
     } catch (error) {
-      console.error("Failed to send level results:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("Error details:", error.response?.data);
+      console.error("Ошибка при отправке результатов:", error);
+
+      let errorMessage = "Произошла ошибка при сохранении результатов";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
       }
-      alert("Network error. Your results might not be saved.");
+
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+      }
+
+      alert(errorMessage);
     } finally {
       setSendingResults(false);
     }
@@ -757,7 +846,7 @@ const GamePage = () => {
 
   useEffect(() => {
     // Функция для предотвращения прокрутки
-    const preventDefault = (e) => {
+    const preventDefault = (e: Event): void => {
       e.preventDefault();
     };
 
@@ -783,6 +872,76 @@ const GamePage = () => {
       document.removeEventListener("wheel", preventDefault);
     };
   }, []);
+
+  // Улучшенная обработка событий касания
+  const handleTouchMove = useCallback(
+    (event: TouchEvent): void => {
+      event.preventDefault();
+
+      if (!isDragging || !draggedGem || !gridRef.current) return;
+
+      const touch = event.touches[0];
+      const { clientX, clientY } = touch;
+
+      setDragPosition({ x: clientX, y: clientY });
+
+      const gridRect = gridRef.current.getBoundingClientRect();
+      const x = clientX - gridRect.left;
+      const y = clientY - gridRect.top;
+
+      const col = Math.floor(x / cellSize);
+      const row = Math.floor(y / cellSize);
+
+      if (
+        row >= 0 &&
+        row < 8 &&
+        col >= 0 &&
+        col < 8 &&
+        (row !== draggedGem.row || col !== draggedGem.col)
+      ) {
+        setTargetGem(grid[row][col]);
+      } else {
+        setTargetGem(null);
+      }
+    },
+    [isDragging, draggedGem, cellSize, grid]
+  );
+
+  useEffect(() => {
+    if (!isBrowser) return;
+
+    try {
+      const user = getTelegramUser();
+
+      if (user) {
+        setUserName(user.first_name || null);
+        setDebugInfo(
+          `Found Telegram user: ${user.username || "no username"}, ${
+            user.first_name || "no first name"
+          }`
+        );
+
+        if (user.username) {
+          fetchUserInfo(user.username);
+        } else {
+          setDebugInfo("No username found in Telegram data");
+          setLoading(false);
+          setError("Не удалось получить имя пользователя из Telegram");
+        }
+      } else {
+        setDebugInfo("Telegram WebApp not available");
+        setLoading(false);
+        // В режиме разработки используем тестового пользователя
+        fetchUserInfo("des1derx");
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        setDebugInfo(`Error in Telegram init: ${error.message}`);
+      }
+      setLoading(false);
+      setError("Ошибка при инициализации Telegram WebApp");
+    }
+  }, [isBrowser]);
 
   return (
     <div className="flex flex-col items-center justify-center p-2 sm:p-4 bg-gray-900 min-h-screen relative overflow-hidden game-container">
