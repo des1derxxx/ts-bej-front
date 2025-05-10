@@ -1,37 +1,79 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
 const BACK_URL = process.env.NEXT_PUBLIC_BACK_URL;
 
+interface Position {
+  angle: number;
+  distance: number;
+}
+
+interface Planet {
+  id: string;
+  number: number;
+  unlocked: boolean;
+  difficulty: "easy" | "medium" | "hard" | "boss";
+  type: string;
+  completed: boolean;
+  perfect: boolean;
+  stars: number;
+  position: Position;
+}
+
+interface GalaxySystem {
+  id: number;
+  unlocked: boolean;
+  planets: Planet[];
+}
+
+interface UserStars {
+  [key: string]: number;
+}
+
+interface UserData {
+  username: string;
+  level: number;
+  stars: UserStars | Map<string, number> | string;
+}
+
+interface GalaxyConfig {
+  systems: number;
+  planetsPerSystem: number;
+}
+
+interface UnlockedContent {
+  unlockedSystems: number;
+  unlockedPlanets: number[];
+}
+
 const GalaxyLevels = () => {
   const router = useRouter();
-  const [galaxy, setGalaxy] = useState([]);
-  const [currentSystem, setCurrentSystem] = useState(1);
-  const [selectedPlanet, setSelectedPlanet] = useState(null);
-  const [isZoomed, setIsZoomed] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [galaxy, setGalaxy] = useState<GalaxySystem[]>([]);
+  const [currentSystem, setCurrentSystem] = useState<number>(1);
+  const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
+  const [isZoomed, setIsZoomed] = useState<boolean>(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Конфигурация галактики
-  const galaxyConfig = {
+  const galaxyConfig: GalaxyConfig = {
     systems: 5,
     planetsPerSystem: 10,
   };
 
   // Fetch user data when component mounts
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserData = async (): Promise<void> => {
       try {
         // Get user data from Telegram WebApp
-        const tg = window.Telegram?.WebApp;
+        const tg = (window as any).Telegram?.WebApp;
 
-        if (!tg || !tg.initDataUnsafe.user?.username) {
+        if (!tg || !tg.initDataUnsafe?.user?.username) {
           console.error("Telegram WebApp user not found");
 
           // Fallback for development or when Telegram WebApp is not available
-          // You can use a dummy user for testing
           setUserData({
             username: "testuser",
             level: 15,
@@ -49,28 +91,34 @@ const GalaxyLevels = () => {
 
         const username = tg.initDataUnsafe.user.username;
 
-        // Make sure the API endpoint is correct
-        // If your API is on a different domain, use the full URL
         try {
-          const response = await axios.post(`${BACK_URL}/getUserInf`, {
-            username,
-          });
+          const response = await axios.post<{ user: UserData }>(
+            `${BACK_URL}/getUserInf`,
+            {
+              username,
+            }
+          );
           setUserData(response.data.user);
         } catch (apiError) {
           console.error("API Error:", apiError);
+          const errorMessage =
+            apiError instanceof AxiosError
+              ? apiError.response?.data?.message || apiError.message
+              : "Неизвестная ошибка при получении данных пользователя";
 
-          // If the API endpoint is not found, check if it's a path issue
-          // Try alternative endpoint formats
+          // Try alternative endpoint as fallback
           try {
-            const altResponse = await axios.post(`${BACK_URL}/getUserInf`, {
-              username,
-            });
+            const altResponse = await axios.post<{ user: UserData }>(
+              `${BACK_URL}/getUserInf`,
+              {
+                username,
+              }
+            );
             setUserData(altResponse.data.user);
           } catch (altError) {
             console.error("Alternative API also failed:", altError);
 
             // Create mock user data for development/testing
-            // Using a plain object instead of Map for stars
             setUserData({
               username: username || "testuser",
               level: 15,
@@ -83,48 +131,43 @@ const GalaxyLevels = () => {
             });
 
             setError(
-              "Could not connect to the server. Using demo data instead."
+              "Не удалось подключиться к серверу. Используются демо-данные."
             );
           }
         }
 
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching user data:", error);
-        setError("Failed to load user data. Please try again later.");
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("Error fetching user data:", errorMessage);
+        setError(
+          "Не удалось загрузить данные пользователя. Пожалуйста, попробуйте позже."
+        );
         setLoading(false);
       }
     };
 
     fetchUserData();
-
-    // // Initialize Telegram WebApp
-    // if (typeof window !== "undefined" && window.Telegram?.WebApp) {
-    //   window.Telegram.WebApp.expand(); // Expand the WebApp to fullscreen
-    // }
   }, []);
 
   // Calculate unlocked systems and planets based on user level
-  const calculateUnlockedContent = (userLevel) => {
-    // Each system requires higher level to unlock
+  const calculateUnlockedContent = (userLevel: number): UnlockedContent => {
     const unlockedSystems = Math.min(
       Math.ceil(userLevel / 10),
       galaxyConfig.systems
     );
 
-    // Calculate how many planets are unlocked in each system
     const unlockedPlanets = Array(galaxyConfig.systems)
       .fill(0)
       .map((_, index) => {
         if (index + 1 > unlockedSystems) return 0;
         if (index + 1 < unlockedSystems) return galaxyConfig.planetsPerSystem;
 
-        // For the first system, directly use the user level as the number of unlocked planets
         if (index === 0) {
           return Math.min(userLevel, galaxyConfig.planetsPerSystem);
         }
 
-        // For subsequent systems, use the original calculation
         const levelWithinSystem = userLevel - index * 10;
         return Math.min(
           Math.ceil(levelWithinSystem * (galaxyConfig.planetsPerSystem / 10)),
@@ -136,18 +179,21 @@ const GalaxyLevels = () => {
   };
 
   // Генерация данных об уровнях с учетом прогресса пользователя
-  const generateGalaxy = (userData) => {
-    if (!userData) return [];
-
+  const generateGalaxy = (userData: UserData): GalaxySystem[] => {
     const { unlockedSystems, unlockedPlanets } = calculateUnlockedContent(
       userData.level
     );
-    const galaxy = [];
-    const difficulties = ["easy", "medium", "hard", "boss"];
+    const galaxy: GalaxySystem[] = [];
+    const difficulties: ("easy" | "medium" | "hard" | "boss")[] = [
+      "easy",
+      "medium",
+      "hard",
+      "boss",
+    ];
     const planetTypes = ["🌍", "🌕", "🪐", "🌟", "☄️", "🌌", "🌑", "🌋"];
 
     for (let s = 0; s < galaxyConfig.systems; s++) {
-      const system = {
+      const system: GalaxySystem = {
         id: s + 1,
         unlocked: s < unlockedSystems,
         planets: [],
@@ -157,19 +203,13 @@ const GalaxyLevels = () => {
         const levelNumber = s * galaxyConfig.planetsPerSystem + p + 1;
         const levelKey = `level_${levelNumber}`;
 
-        // Safely access stars data
         let starCount = 0;
         if (userData.stars) {
-          // Check if stars is a Map
           if (userData.stars instanceof Map) {
             starCount = userData.stars.get(levelKey) || 0;
-          }
-          // Check if stars is a plain object
-          else if (typeof userData.stars === "object") {
+          } else if (typeof userData.stars === "object") {
             starCount = userData.stars[levelKey] || 0;
-          }
-          // Check if stars is a string that can be parsed as JSON
-          else if (typeof userData.stars === "string") {
+          } else if (typeof userData.stars === "string") {
             try {
               const starsObj = JSON.parse(userData.stars);
               starCount = starsObj[levelKey] || 0;
@@ -209,7 +249,7 @@ const GalaxyLevels = () => {
     }
   }, [userData]);
 
-  const handlePlanetClick = (planet) => {
+  const handlePlanetClick = (planet: Planet): void => {
     if (!planet.unlocked) return;
 
     setSelectedPlanet(planet.id);
@@ -220,14 +260,14 @@ const GalaxyLevels = () => {
     }, 1000);
   };
 
-  const handleSystemChange = (systemId) => {
+  const handleSystemChange = (systemId: number): void => {
     setCurrentSystem(systemId);
     setSelectedPlanet(null);
     setIsZoomed(false);
   };
 
   // Styles for planets
-  const getPlanetStyle = (planet) => {
+  const getPlanetStyle = (planet: Planet): string => {
     const base =
       "w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center text-2xl md:text-3xl shadow-xl transition-all duration-500";
 
@@ -266,7 +306,7 @@ const GalaxyLevels = () => {
   if (loading) {
     return (
       <div className="w-full h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading galaxy...</div>
+        <div className="text-white text-xl">Загрузка галактики...</div>
       </div>
     );
   }
@@ -275,13 +315,15 @@ const GalaxyLevels = () => {
   if (!userData || !galaxy.length) {
     return (
       <div className="w-full h-screen bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center">
-        <div className="text-white text-xl mb-4">Error loading galaxy data</div>
+        <div className="text-white text-xl mb-4">
+          Ошибка загрузки данных галактики
+        </div>
         {error && <div className="text-red-400 text-sm">{error}</div>}
         <button
           onClick={() => window.location.reload()}
           className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full"
         >
-          Try Again
+          Попробовать снова
         </button>
       </div>
     );
