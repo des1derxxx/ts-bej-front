@@ -1,27 +1,58 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+// Базовые интерфейсы для данных
+interface NFT {
+  _id: string;
+  nftId: number;
+  name: string;
+  rarity: string;
+  counter: number;
+  path?: string;
+  obtainedAt?: string;
+}
+
+interface UserInfo {
+  username: string;
+  bombs: number;
+  mix: number;
+  cases: number;
+}
+
+interface Gem {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  speed: number;
+  rotation: number;
+  rotationSpeed: number;
+}
+
 const Shop = () => {
-  const [userInfo, setUserInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [glowIntensity, setGlowIntensity] = useState(0);
-  const [userName, setUserName] = useState(null);
-  const [debugInfo, setDebugInfo] = useState(null);
-  const [activeTab, setActiveTab] = useState("items"); // "items" or "nft"
-  const [animationFrame, setAnimationFrame] = useState(0);
-  const [gems, setGems] = useState([]);
-  const [isBrowser, setIsBrowser] = useState(false);
-  const [nfts, setNfts] = useState([]); // State for storing NFTs from API
-  const [showCaseOpening, setShowCaseOpening] = useState(false);
-  const [caseAnimationStage, setCaseAnimationStage] = useState(0); // 0: not started, 1: spinning, 2: result
-  const [selectedNft, setSelectedNft] = useState(null);
-  const [possibleNfts, setPossibleNfts] = useState([]);
-  const [scrollingNfts, setScrollingNfts] = useState([]);
-  const [currentScrollingIndex, setCurrentScrollingIndex] = useState(0);
-  const scrollIntervalRef = useRef(null);
-  const [userNfts, setUserNfts] = useState([]);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<number | null>(null);
+  const [glowIntensity, setGlowIntensity] = useState<number>(0);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"items" | "nft" | "my-nft">(
+    "items"
+  );
+  const [animationFrame, setAnimationFrame] = useState<number>(0);
+  const [gems, setGems] = useState<Gem[]>([]);
+  const [isBrowser, setIsBrowser] = useState<boolean>(false);
+  const [nfts, setNfts] = useState<NFT[]>([]);
+  const [showCaseOpening, setShowCaseOpening] = useState<boolean>(false);
+  const [caseAnimationStage, setCaseAnimationStage] = useState<number>(0);
+  const [selectedNft, setSelectedNft] = useState<NFT | null>(null);
+  const [possibleNfts, setPossibleNfts] = useState<NFT[]>([]);
+  const [scrollingNfts, setScrollingNfts] = useState<NFT[]>([]);
+  const [currentScrollingIndex, setCurrentScrollingIndex] = useState<number>(0);
+  const [userNfts, setUserNfts] = useState<NFT[]>([]);
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Define backUrl for API calls
   const backUrl = "https://des1derx-back.serveo.net"; // Adjust this based on your backend URL
@@ -100,7 +131,7 @@ const Shop = () => {
         setPossibleNfts(response.data);
       } catch (error) {
         console.error("Ошибка при загрузке NFT:", error);
-        setDebugInfo(`Ошибка при загрузке NFT: ${error.message}`);
+        setDebugInfo(`Ошибка при загрузке NFT: ${error}`);
 
         // For development - set some mock NFTs for the case
         setPossibleNfts([
@@ -155,162 +186,139 @@ const Shop = () => {
 
   // Generate falling gems once we're in the browser
   useEffect(() => {
-    if (isBrowser) {
-      const newGems = [];
-      const isMobile = window.innerWidth < 768;
-      const gemCount = isMobile ? 15 : 20;
+    if (!isBrowser) return;
 
-      for (let i = 0; i < gemCount; i++) {
-        newGems.push({
-          id: i,
-          x: Math.random() * 100,
-          y: Math.random() * 100,
-          size: Math.random() * 20 + 20,
-          color: gemColors[Math.floor(Math.random() * gemColors.length)],
-          speed: Math.random() * 0.5 + 0.2,
-          rotation: Math.random() * 360,
-          rotationSpeed: (Math.random() - 0.5) * 2,
-        });
-      }
-      setGems(newGems);
+    const newGems: Gem[] = [];
+    const isMobile = window.innerWidth < 768;
+    const gemCount = isMobile ? 15 : 20;
+
+    for (let i = 0; i < gemCount; i++) {
+      newGems.push({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: Math.random() * 20 + 20,
+        color: gemColors[Math.floor(Math.random() * gemColors.length)],
+        speed: Math.random() * 0.5 + 0.2,
+        rotation: Math.random() * 360,
+        rotationSpeed: (Math.random() - 0.5) * 2,
+      });
     }
+    setGems(newGems);
   }, [isBrowser]);
 
-  // Get username from Telegram WebApp - only in browser
+  // Функция для безопасного получения данных пользователя из Telegram WebApp
+  const getTelegramUser = () => {
+    try {
+      const webApp = (window as any).Telegram?.WebApp;
+      if (!webApp) return null;
+
+      const user = webApp.initDataUnsafe?.user;
+      if (!user) return null;
+
+      return {
+        username: typeof user.username === "string" ? user.username : undefined,
+        firstName:
+          typeof user.first_name === "string" ? user.first_name : undefined,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (!isBrowser) return;
 
     try {
-      // Make sure the Telegram WebApp object is available
-      if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        const user = tg.initDataUnsafe?.user;
-        if (user) {
-          setUserName(user.first_name); // Get user's first name
+      const user = getTelegramUser();
 
-          // For debugging
-          setDebugInfo(
-            `Found Telegram user: ${user.username || "no username"}, ${
-              user.first_name || "no first name"
-            }`
-          );
+      if (user) {
+        setUserName(user.firstName || null);
+        setDebugInfo(
+          `Found Telegram user: ${user.username || "no username"}, ${
+            user.firstName || "no first name"
+          }`
+        );
 
-          // Once we have the username, fetch user info
-          if (user.username) {
-            fetchUserInfo(user.username);
-          } else {
-            // Fallback in case username is not available
-            setDebugInfo("No username found in Telegram data");
-            setLoading(false);
-            setError("Не удалось получить имя пользователя из Telegram");
-          }
+        if (user.username) {
+          fetchUserInfo(user.username);
         } else {
-          setDebugInfo("No user found in initDataUnsafe");
+          setDebugInfo("No username found in Telegram data");
           setLoading(false);
-          setError("Не удалось получить данные пользователя из Telegram");
+          setError("Не удалось получить имя пользователя из Telegram");
         }
       } else {
         setDebugInfo("Telegram WebApp not available");
         setLoading(false);
-
-        // In development, you can use this to load mock data
-        // Comment out for production
-        fetchUserInfo("des1derx"); // Use a test username for development
+        // В режиме разработки используем тестового пользователя
+        fetchUserInfo("des1derx");
       }
-    } catch (err) {
-      setDebugInfo(`Error in Telegram init: ${err.message}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        setDebugInfo(`Error in Telegram init: ${error.message}`);
+      }
       setLoading(false);
       setError("Ошибка при инициализации Telegram WebApp");
     }
   }, [isBrowser]);
 
   // Fetch user information
-  const fetchUserInfo = async (username) => {
+  const fetchUserInfo = async (username: string) => {
     try {
       setLoading(true);
       setDebugInfo(`Attempting to fetch data for user: ${username}`);
 
-      // Try API call
-      const response = await axios.post(`${backUrl}/getUserInf`, {
-        username: username,
-      });
+      const response = await axios.post<{ user: UserInfo }>(
+        `${backUrl}/getUserInf`,
+        {
+          username: username,
+        }
+      );
 
       setUserInfo(response.data.user);
       setDebugInfo(
         `Data loaded successfully: ${JSON.stringify(response.data.user)}`
       );
       setLoading(false);
-    } catch (err) {
-      console.error("Error fetching user info:", err);
+    } catch (error) {
+      console.error("Error fetching user info:", error);
 
-      // Detailed error information
       let errorMessage = "Не удалось загрузить информацию о пользователе";
-      if (err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        errorMessage += ` (Статус: ${err.response.status})`;
-        setDebugInfo(
-          `API Error: ${err.response.status} - ${JSON.stringify(
-            err.response.data
-          )}`
-        );
-      } else if (err.request) {
-        // The request was made but no response was received
-        errorMessage += " (Нет ответа от сервера)";
-        setDebugInfo(`Network Error: Request made but no response received`);
-      } else {
-        // Something happened in setting up the request that triggered an Error
-        errorMessage += ` (${err.message})`;
-        setDebugInfo(`Request Error: ${err.message}`);
+
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          errorMessage += ` (Статус: ${error.response.status})`;
+          setDebugInfo(
+            `API Error: ${error.response.status} - ${JSON.stringify(
+              error.response.data
+            )}`
+          );
+        } else if (error.request) {
+          errorMessage += " (Нет ответа от сервера)";
+          setDebugInfo(`Network Error: Request made but no response received`);
+        } else {
+          errorMessage += ` (${error.message})`;
+          setDebugInfo(`Request Error: ${error.message}`);
+        }
       }
 
       setError(errorMessage);
       setLoading(false);
 
       // For development - load mock data if API fails
-      // Comment out for production
       setUserInfo({
-        username: username || "test_user",
+        username: username,
         bombs: 3,
         mix: 4,
-        cases: 2, // Add case count for the user
+        cases: 2,
       });
     }
   };
 
-  // useEffect(() => {
-  //   // Функция для предотвращения прокрутки
-  //   const preventDefault = (e) => {
-  //     e.preventDefault();
-  //   };
-
-  //   // Блокировка прокрутки при монтировании компонента
-  //   document.body.style.overflow = "hidden";
-  //   document.body.style.position = "fixed";
-  //   document.body.style.width = "100%";
-  //   document.body.style.height = "100%";
-  //   document.body.style.touchAction = "none";
-
-  //   // Добавление обработчиков событий для предотвращения прокрутки
-  //   document.addEventListener("touchmove", preventDefault, { passive: false });
-  //   document.addEventListener("wheel", preventDefault, { passive: false });
-
-  //   // Очистка при размонтировании
-  //   return () => {
-  //     document.body.style.overflow = "";
-  //     document.body.style.position = "";
-  //     document.body.style.width = "";
-  //     document.body.style.height = "";
-  //     document.body.style.touchAction = "";
-  //     document.removeEventListener("touchmove", preventDefault);
-  //     document.removeEventListener("wheel", preventDefault);
-  //   };
-  // }, []);
-
   useEffect(() => {
-    const handleWheel = (e) => {
-      // Разрешаем прокрутку только для элементов с классом allow-scroll
-      if (!e.target.closest(".allow-scroll")) {
+    const handleWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".allow-scroll")) {
         e.preventDefault();
       }
     };
@@ -390,65 +398,64 @@ const Shop = () => {
     }
   }, [showCaseOpening, caseAnimationStage, possibleNfts]);
 
-  const handleBuyItem = (item) => {
-    // In a real implementation, you would send a request to buy the item
+  const handleBuyItem = (item: { id: number; name: string }) => {
     setSelectedItem(item.id);
     console.log(`Buying ${item.name}`);
-    // Add API call to update user's items
   };
 
-  // Модифицируем функцию handleOpenCase
   const handleOpenCase = async () => {
     try {
-      // 1. Сначала получаем NFT с бекенда
-      const response = await axios.post(`${backUrl}/openCase`, {
-        username: userInfo.username,
-      });
+      if (!userInfo?.username) return;
+
+      const response = await axios.post<{ nft: NFT; remainingCases: number }>(
+        `${backUrl}/openCase`,
+        {
+          username: userInfo.username,
+        }
+      );
 
       if (response.data && response.data.nft) {
-        const receivedNft = response.data.nft;
+        startNftScrolling(response.data.nft);
 
-        // 2. Начинаем анимацию прокрутки с известным NFT
-        startNftScrolling(receivedNft);
+        setUserInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                cases: response.data.remainingCases,
+              }
+            : null
+        );
 
-        // 3. Обновляем состояние пользователя
-        setUserInfo({
-          ...userInfo,
-          cases: response.data.remainingCases,
-        });
-
-        // 4. Обновляем список NFT пользователя
         await fetchUserNfts();
       }
     } catch (error) {
       console.error("Ошибка при открытии кейса:", error);
-      setDebugInfo(`Ошибка при открытии кейса: ${error.message}`);
+      if (error instanceof Error) {
+        setDebugInfo(`Ошибка при открытии кейса: ${error.message}`);
+      }
       closeCase();
     }
   };
 
-  const startNftScrolling = (targetNft) => {
+  const startNftScrolling = (targetNft: NFT) => {
     setShowCaseOpening(true);
     setCaseAnimationStage(1);
 
-    // Находим индекс целевого NFT в possibleNfts
     const targetIndex = possibleNfts.findIndex(
       (nft) => nft._id === targetNft._id
     );
 
-    // Создаем массив для прокрутки, который заканчивается на целевом NFT
     const scrollArray = [
-      ...possibleNfts.slice(targetIndex), // NFT от целевого до конца
-      ...possibleNfts, // Полный список
-      ...possibleNfts, // Еще раз полный список
-      targetNft, // Завершаем на целевом NFT
+      ...possibleNfts.slice(targetIndex),
+      ...possibleNfts,
+      ...possibleNfts,
+      targetNft,
     ];
 
     setScrollingNfts(scrollArray);
     setCurrentScrollingIndex(0);
 
-    // Настройки анимации
-    let speed = 100; // Начальная скорость
+    let speed = 100;
     const minSpeed = 50;
     const maxSpeed = 400;
     const slowDownPoint = Math.floor(scrollArray.length * 0.7);
@@ -457,16 +464,18 @@ const Shop = () => {
       setCurrentScrollingIndex((prev) => {
         const nextIndex = prev + 1;
 
-        // Замедление при приближении к концу
         if (nextIndex > slowDownPoint) {
           speed = Math.min(speed + 20, maxSpeed);
-          clearInterval(scrollIntervalRef.current);
-          scrollIntervalRef.current = setInterval(scroll, speed);
+          if (scrollIntervalRef.current) {
+            clearInterval(scrollIntervalRef.current);
+            scrollIntervalRef.current = setInterval(scroll, speed);
+          }
         }
 
-        // Остановка в конце
         if (nextIndex >= scrollArray.length - 1) {
-          clearInterval(scrollIntervalRef.current);
+          if (scrollIntervalRef.current) {
+            clearInterval(scrollIntervalRef.current);
+          }
           setSelectedNft(targetNft);
           setCaseAnimationStage(2);
           return prev;
@@ -477,17 +486,19 @@ const Shop = () => {
 
     scrollIntervalRef.current = setInterval(scroll, speed);
 
-    // Ускорение в начале
     const accelerate = setInterval(() => {
       if (speed > minSpeed) {
         speed = Math.max(speed - 10, minSpeed);
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = setInterval(scroll, speed);
+        if (scrollIntervalRef.current) {
+          clearInterval(scrollIntervalRef.current);
+          scrollIntervalRef.current = setInterval(scroll, speed);
+        }
       } else {
         clearInterval(accelerate);
       }
     }, 150);
   };
+
   const closeCase = () => {
     if (scrollIntervalRef.current) {
       clearInterval(scrollIntervalRef.current);
@@ -499,7 +510,7 @@ const Shop = () => {
   };
 
   // Get rarity color class based on rarity
-  const getRarityColorClass = (rarity) => {
+  const getRarityColorClass = (rarity?: string): string => {
     switch (rarity?.toLowerCase()) {
       case "common":
         return "bg-gray-600";
@@ -517,7 +528,7 @@ const Shop = () => {
   };
 
   // Get rarity text color class based on rarity
-  const getRarityTextColorClass = (rarity) => {
+  const getRarityTextColorClass = (rarity?: string): string => {
     switch (rarity?.toLowerCase()) {
       case "common":
         return "text-gray-200";
@@ -536,14 +547,51 @@ const Shop = () => {
 
   const fetchUserNfts = async () => {
     try {
-      const response = await axios.get(`${backUrl}/user/nft`, {
+      if (!userInfo?.username) return;
+
+      const response = await axios.get<NFT[]>(`${backUrl}/user/nft`, {
         params: { username: userInfo.username },
       });
       setUserNfts(response.data);
     } catch (error) {
       console.error("Ошибка при загрузке NFT пользователя:", error);
-      setDebugInfo(`Ошибка загрузки NFT пользователя: ${error.message}`);
+      if (error instanceof Error) {
+        setDebugInfo(`Ошибка загрузки NFT пользователя: ${error.message}`);
+      }
     }
+  };
+
+  // Обработчики событий для изображений
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.currentTarget;
+    target.onerror = null;
+    target.src = "/api/placeholder/64/64";
+  };
+
+  const handleLargeImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.currentTarget;
+    target.onerror = null;
+    target.src = "/api/placeholder/128/128";
+  };
+
+  // Типизированная функция для получения иконки редкости
+  const getRarityIcon = (rarity: string | undefined): string => {
+    if (!rarity) return "💎";
+    const normalizedRarity = rarity.toLowerCase() as keyof typeof rarityIcons;
+    return rarityIcons[normalizedRarity] || "💎";
+  };
+
+  // Типизированная функция для получения названия редкости
+  const getRarityName = (rarity: string | undefined): string => {
+    if (!rarity) return "Неизвестно";
+    const normalizedRarity = rarity.toLowerCase() as keyof typeof rarityMap;
+    return rarityMap[normalizedRarity] || rarity;
+  };
+
+  // Форматирование даты
+  const formatDate = (date: string | undefined): string => {
+    if (!date) return "Нет данных";
+    return new Date(date).toLocaleDateString();
   };
 
   if (loading) {
@@ -581,7 +629,6 @@ const Shop = () => {
                   Открываем кейс...
                 </h3>
 
-                {/* Контейнер для прокручивающихся NFT */}
                 <div className="relative h-32 overflow-hidden mb-6">
                   <div
                     className="transition-transform duration-150 ease-linear"
@@ -602,15 +649,12 @@ const Shop = () => {
                               src={`${backUrl}${nft.path}`}
                               alt={nft.name}
                               className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = "/api/placeholder/128/128";
-                              }}
+                              onError={handleLargeImageError}
                             />
                           </div>
                         ) : (
                           <div className="text-4xl mb-2">
-                            {rarityIcons[nft.rarity?.toLowerCase()] || "💎"}
+                            {getRarityIcon(nft.rarity)}
                           </div>
                         )}
                         <span className="text-sm font-medium text-white truncate w-full px-2">
@@ -620,11 +664,8 @@ const Shop = () => {
                     ))}
                   </div>
 
-                  {/* Полоски сверху и снизу для визуального эффекта */}
                   <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-indigo-800 to-transparent"></div>
                   <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-indigo-800 to-transparent"></div>
-
-                  {/* Выделенная область в центре */}
                   <div className="absolute top-1/2 left-0 right-0 h-16 border-t-2 border-b-2 border-yellow-400 transform -translate-y-1/2"></div>
                 </div>
               </div>
@@ -643,15 +684,12 @@ const Shop = () => {
                           src={`${backUrl}${selectedNft.path}`}
                           alt={selectedNft.name}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = "/api/placeholder/128/128";
-                          }}
+                          onError={handleLargeImageError}
                         />
                       </div>
                     ) : (
                       <div className="text-5xl mb-2">
-                        {rarityIcons[selectedNft.rarity?.toLowerCase()] || "💎"}
+                        {getRarityIcon(selectedNft.rarity)}
                       </div>
                     )}
                     <h4 className="text-xl font-bold text-white">
@@ -662,8 +700,7 @@ const Shop = () => {
                         selectedNft.rarity
                       )} rounded-md text-sm font-bold`}
                     >
-                      {rarityMap[selectedNft.rarity?.toLowerCase()] ||
-                        selectedNft.rarity}
+                      {getRarityName(selectedNft.rarity)}
                     </span>
                   </div>
                 </div>
@@ -690,7 +727,7 @@ const Shop = () => {
           </div>
         </div>
       )}
-      {/* Анимированные падающие драгоценные камни на фоне */}
+
       {gems.map((gem) => (
         <div
           key={gem.id}
@@ -706,9 +743,7 @@ const Shop = () => {
         />
       ))}
 
-      {/* Content area */}
       <div className="relative min-h-screen flex flex-col items-center py-6 md:py-12 z-10 px-4">
-        {/* Game logo */}
         <div className="mt-4 md:mt-6 mb-3 md:mb-4 text-center">
           <h1 className="text-3xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-300 drop-shadow-lg">
             МАГАЗИН
@@ -720,7 +755,6 @@ const Shop = () => {
           )}
         </div>
 
-        {/* User info display */}
         <div className="mb-4 flex items-center justify-center gap-6 md:gap-10">
           <div className="flex items-center gap-2">
             <div className="text-3xl md:text-4xl">💣</div>
@@ -737,12 +771,11 @@ const Shop = () => {
           <div className="flex items-center gap-2">
             <div className="text-3xl md:text-4xl">📦</div>
             <span className="text-xl md:text-2xl font-bold text-white">
-              {userInfo?.cases || 2}
+              {userInfo?.cases || 0}
             </span>
           </div>
         </div>
 
-        {/* Tab switcher */}
         <div className="flex w-full md:w-4/5 max-w-md mb-4 rounded-lg overflow-hidden">
           <button
             className={`flex-1 py-2 md:py-3 text-center font-bold text-base md:text-lg transition-all duration-300 ${
@@ -779,7 +812,6 @@ const Shop = () => {
           </button>
         </div>
 
-        {/* Shop items */}
         <div className="flex flex-col w-full md:w-4/5 max-w-md gap-3 md:gap-4 overflow-y-auto pb-4 allow-scroll">
           {activeTab === "items" &&
             shopItems.map((item) => (
@@ -819,7 +851,6 @@ const Shop = () => {
               </div>
             ))}
 
-          {/* NFT items loaded from API */}
           {activeTab === "nft" && (
             <>
               {nfts.length > 0 ? (
@@ -842,28 +873,24 @@ const Shop = () => {
                       }}
                     >
                       <div className="flex items-center flex-1 min-w-0">
-                        {/* Image preview if available, otherwise use rarity icon */}
                         {nft.path ? (
                           <div className="w-12 h-12 md:w-16 md:h-16 mr-3 md:mr-4 rounded-lg bg-indigo-800 flex-shrink-0 overflow-hidden">
                             <img
                               src={`${backUrl}${nft.path}`}
                               alt={nft.name}
                               className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = "/api/placeholder/64/64";
-                              }}
+                              onError={handleImageError}
                             />
                           </div>
                         ) : (
                           <span className="mr-3 md:mr-4 text-2xl md:text-3xl flex-shrink-0">
-                            {rarityIcons[nft.rarity?.toLowerCase()] || "💎"}
+                            {getRarityIcon(nft.rarity)}
                           </span>
                         )}
 
                         <div className="min-w-0">
                           <h3 className="text-lg md:text-xl font-bold truncate">
-                            {nft.name}
+                            {getRarityName(nft.rarity)}
                           </h3>
                           <p className="text-xs md:text-sm text-gray-200 line-clamp-2">
                             NFT #{nft.nftId}
@@ -873,12 +900,11 @@ const Shop = () => {
                               nft.rarity
                             )} rounded-md text-xs font-bold`}
                           >
-                            {rarityMap[nft.rarity?.toLowerCase()] || nft.rarity}
+                            {getRarityName(nft.rarity)}
                           </span>
                         </div>
                       </div>
 
-                      {/* We could add buttons for NFT interactions here if needed */}
                       <div className="ml-2 md:ml-4">
                         <span className="block text-sm font-medium text-center mb-1">
                           Счетчик
@@ -890,7 +916,6 @@ const Shop = () => {
                     </div>
                   ))}
 
-                  {/* NFT Case */}
                   <div className="mt-4 relative flex flex-col justify-center items-center py-4 md:py-6 px-4 md:px-6 rounded-lg transition-all duration-300 bg-gradient-to-r from-amber-600 to-yellow-700 text-white shadow-lg">
                     <div className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full px-2 py-1 text-xs font-bold">
                       Новое!
@@ -926,7 +951,6 @@ const Shop = () => {
                     </p>
                   </div>
 
-                  {/* NFT Case */}
                   <div className="mt-2 relative flex flex-col justify-center items-center py-4 md:py-6 px-4 md:px-6 rounded-lg transition-all duration-300 bg-gradient-to-r from-amber-600 to-yellow-700 text-white shadow-lg">
                     <div className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full px-2 py-1 text-xs font-bold">
                       Новое!
@@ -973,27 +997,24 @@ const Shop = () => {
                           src={`${backUrl}${nft.path}`}
                           alt={nft.name}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = "/api/placeholder/64/64";
-                          }}
+                          onError={handleImageError}
                         />
                       </div>
                     ) : (
                       <span className="mr-3 md:mr-4 text-2xl md:text-3xl flex-shrink-0">
-                        {rarityIcons[nft.rarity?.toLowerCase()] || "💎"}
+                        {getRarityIcon(nft.rarity)}
                       </span>
                     )}
                     <div className="min-w-0">
                       <h3 className="text-lg md:text-xl font-bold truncate">
-                        {nft.name}
+                        {getRarityName(nft.rarity)}
                       </h3>
                       <span
                         className={`inline-block mt-1 px-2 py-0.5 ${getRarityColorClass(
                           nft.rarity
                         )} rounded-md text-xs font-bold`}
                       >
-                        {rarityMap[nft.rarity?.toLowerCase()] || nft.rarity}
+                        {getRarityName(nft.rarity)}
                       </span>
                     </div>
                   </div>
@@ -1002,7 +1023,7 @@ const Shop = () => {
                       Получено
                     </span>
                     <span className="block text-center font-bold">
-                      {new Date(nft.obtainedAt).toLocaleDateString()}
+                      {formatDate(nft.obtainedAt)}
                     </span>
                   </div>
                 </div>
@@ -1017,7 +1038,6 @@ const Shop = () => {
             )}
           </div>
         )}
-        {/* Back button */}
         <button
           className="mt-auto mb-4 md:mb-6 px-5 py-2 md:px-6 md:py-3 bg-gradient-to-r from-indigo-700 to-purple-800 rounded-lg font-bold text-white shadow-lg hover:scale-105 transition-transform"
           onClick={() => window.history.back()}
