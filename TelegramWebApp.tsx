@@ -2,29 +2,6 @@
 
 import { useEffect } from "react";
 
-declare global {
-  interface Window {
-    Telegram: {
-      WebApp: {
-        initData: string;
-        initDataUnsafe: object;
-        version: string;
-        platform: string;
-        colorScheme: string;
-        isExpanded: boolean;
-        isClosingConfirmationEnabled: boolean;
-        themeParams: object;
-        sendData: (data: string) => void;
-        close: () => void;
-        expand: () => void;
-        onEvent: (eventType: string, callback: Function) => void;
-        offEvent: (eventType: string, callback: Function) => void;
-        MainButton?: any; // если будешь использовать кнопку Telegram
-      };
-    };
-  }
-}
-
 const isTelegramWebApp = () => {
   return (
     typeof window !== "undefined" &&

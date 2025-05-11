@@ -20,27 +20,35 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 const backUrl = process.env.NEXT_PUBLIC_BACK_URL;
 
+interface NFT {
+  _id: string;
+  nftId: number;
+  name: string;
+  rarity: string;
+  path?: string;
+}
+
 const AdminPage = () => {
   const [opened, { toggle }] = useDisclosure();
   const [showNftForm, setShowNftForm] = useState(false);
   const [nftName, setNftName] = useState("");
-  const [nftImage, setNftImage] = useState(null);
-  const [nftRarity, setNftRarity] = useState("");
+  const [nftImage, setNftImage] = useState<File | null>(null);
+  const [nftRarity, setNftRarity] = useState<string | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
-  const [nfts, setNfts] = useState([]);
+  const [nfts, setNfts] = useState<NFT[]>([]);
 
   const handleCreateNft = () => {
     setShowNftForm(true);
   };
 
-  const handleImageChange = (file) => {
+  const handleImageChange = (file: File | null) => {
     setNftImage(file);
 
     if (file) {
       // Create a preview URL for the selected image
       const fileReader = new FileReader();
       fileReader.onloadend = () => {
-        setImagePreviewUrl(fileReader.result);
+        setImagePreviewUrl(fileReader.result as string);
       };
       fileReader.readAsDataURL(file);
     } else {
@@ -49,6 +57,8 @@ const AdminPage = () => {
   };
 
   const handleSubmit = async () => {
+    if (!nftImage || !nftName || !nftRarity) return;
+
     const formData = new FormData();
     formData.append("image", nftImage);
     formData.append("name", nftName);
@@ -66,7 +76,7 @@ const AdminPage = () => {
       // Reset form
       setNftName("");
       setNftImage(null);
-      setNftRarity("");
+      setNftRarity(null);
       setImagePreviewUrl("");
       setShowNftForm(false);
     } catch (error) {
@@ -105,21 +115,21 @@ const AdminPage = () => {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Stack>
+        <Stack gap="md">
           <Button color="blue" onClick={handleCreateNft} disabled={showNftForm}>
             Create NFT
           </Button>
 
           {showNftForm && (
             <Paper shadow="xs" p="md" withBorder>
-              <Stack spacing="md">
+              <Stack gap="md">
                 <Text size="lg" fw={500}>
                   Create New NFT
                 </Text>
 
-                <Group position="apart" align="flex-start" spacing="xl">
-                  <Box sx={{ flex: 1 }}>
-                    <Stack spacing="md">
+                <Group gap="xl">
+                  <Box style={{ flex: 1 }}>
+                    <Stack gap="md">
                       <FileInput
                         label="Upload NFT Image"
                         placeholder="Select image"
@@ -156,8 +166,8 @@ const AdminPage = () => {
                     </Stack>
                   </Box>
 
-                  <Box sx={{ flex: 1 }}>
-                    <Text weight={500} mb="sm">
+                  <Box style={{ flex: 1 }}>
+                    <Text fw={500} mb="sm">
                       Image Preview
                     </Text>
                     {imagePreviewUrl ? (
@@ -167,7 +177,6 @@ const AdminPage = () => {
                         alt="NFT Preview"
                         height={240}
                         fit="contain"
-                        withPlaceholder={false}
                       />
                     ) : (
                       <Center
@@ -177,18 +186,18 @@ const AdminPage = () => {
                           height: "240px",
                         }}
                       >
-                        <Text color="dimmed">No image selected</Text>
+                        <Text c="dimmed">No image selected</Text>
                       </Center>
                     )}
 
                     {nftName && (
-                      <Text align="center" size="lg" weight={500} mt="sm">
+                      <Text ta="center" size="lg" fw={500} mt="sm">
                         {nftName}
                       </Text>
                     )}
 
                     {nftRarity && (
-                      <Text align="center" color="dimmed" mt="xs">
+                      <Text ta="center" c="dimmed" mt="xs">
                         Rarity:{" "}
                         {nftRarity.charAt(0).toUpperCase() + nftRarity.slice(1)}
                       </Text>
@@ -196,14 +205,14 @@ const AdminPage = () => {
                   </Box>
                 </Group>
 
-                <Group position="right" mt="md">
+                <Group justify="flex-end" gap="sm">
                   <Button
                     variant="outline"
                     onClick={() => {
                       setShowNftForm(false);
                       setNftName("");
                       setNftImage(null);
-                      setNftRarity("");
+                      setNftRarity(null);
                       setImagePreviewUrl("");
                     }}
                   >
@@ -217,7 +226,7 @@ const AdminPage = () => {
         </Stack>
         <Grid>
           {nfts.map((nft) => (
-            <Grid.Col span={4} key={nft.nftId}>
+            <Grid.Col span={4} key={nft._id}>
               <Card shadow="sm" padding="lg" radius="md" withBorder>
                 <Card.Section>
                   <Image
@@ -230,7 +239,7 @@ const AdminPage = () => {
                 <Text fw={500} size="lg" mt="md">
                   {nft.name}
                 </Text>
-                <Text size="sm" color="dimmed">
+                <Text size="sm" c="dimmed">
                   Rarity: {nft.rarity}
                 </Text>
               </Card>
