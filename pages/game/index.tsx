@@ -487,8 +487,8 @@ const GamePage: React.FC = () => {
     return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
   };
 
-  const handleMatches = (matchedPositions: string[]) => {
-    if (isProcessing || matchedPositions.length === 0) return;
+  const handleMatches = (matchedPositions: string[]): boolean => {
+    if (isProcessing || matchedPositions.length === 0) return false;
     setIsProcessing(true);
 
     // Create a new grid to modify
@@ -513,6 +513,7 @@ const GamePage: React.FC = () => {
     setTimeout(() => {
       replaceMatchedGems();
     }, 300);
+    return true;
   };
 
   // Обновление функций с типами
@@ -520,16 +521,48 @@ const GamePage: React.FC = () => {
     if (!isAdjacent(gem1.row, gem1.col, gem2.row, gem2.col)) return;
 
     setIsSwapping(true);
-    const newGrid = [...grid];
-    const tempType = newGrid[gem1.row][gem1.col].type;
 
-    newGrid[gem1.row][gem1.col].type = newGrid[gem2.row][gem2.col].type;
-    newGrid[gem2.row][gem2.col].type = tempType;
+    // Создаем копию сетки для изменений
+    const newGrid = [...grid];
+
+    // Сохраняем исходные типы гемов на случай отката
+    const originalType1 = newGrid[gem1.row][gem1.col].type;
+    const originalType2 = newGrid[gem2.row][gem2.col].type;
+
+    // Меняем гемы местами
+    newGrid[gem1.row][gem1.col].type = originalType2;
+    newGrid[gem2.row][gem2.col].type = originalType1;
 
     setGrid(newGrid);
+
+    // Проверяем совпадения после небольшой задержки для анимации
     setTimeout(() => {
+      const hasMatches = checkMatches();
+
+      // Если совпадений нет - возвращаем гемы на место
+      if (!hasMatches) {
+        setTimeout(() => {
+          const revertedGrid = [...grid];
+          revertedGrid[gem1.row][gem1.col].type = originalType1;
+          revertedGrid[gem2.row][gem2.col].type = originalType2;
+          setGrid(revertedGrid);
+
+          // Добавляем анимацию "отказа" для визуальной обратной связи
+          const gemElements = document.querySelectorAll(
+            `[data-gem-id="${gem1.row}-${gem1.col}"], 
+           [data-gem-id="${gem2.row}-${gem2.col}"]`
+          );
+
+          gemElements.forEach((gem) => {
+            gem.classList.add("animate-shake");
+            setTimeout(() => {
+              gem.classList.remove("animate-shake");
+            }, 500);
+          });
+        }, 300);
+      }
+
       setIsSwapping(false);
-      checkMatches();
     }, 300);
   };
 
@@ -619,7 +652,7 @@ const GamePage: React.FC = () => {
     setTimeout(() => setIsMixing(false), 800);
   };
 
-  const checkMatches = useCallback(() => {
+  const checkMatches = useCallback((): boolean => {
     // Создаем копию только если нашли совпадения
     if (isProcessing) return false;
 
@@ -971,6 +1004,29 @@ const GamePage: React.FC = () => {
         .draggable {
           -webkit-user-drag: none;
           -webkit-tap-highlight-color: transparent;
+        }
+        .animate-shake {
+          animation: shake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        @keyframes shake {
+          10%,
+          90% {
+            transform: translate3d(-1px, 0, 0);
+          }
+          20%,
+          80% {
+            transform: translate3d(2px, 0, 0);
+          }
+          30%,
+          50%,
+          70% {
+            transform: translate3d(-4px, 0, 0);
+          }
+          40%,
+          60% {
+            transform: translate3d(4px, 0, 0);
+          }
         }
       `}</style>
       {/* Фоновые кристаллы */}
