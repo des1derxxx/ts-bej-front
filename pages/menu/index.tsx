@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import axios from "axios";
 import TelegramWebApp from "../../TelegramWebApp";
+
+const BACK_URL = process.env.NEXT_PUBLIC_BACK_URL;
 
 interface Gem {
   id: number;
@@ -27,6 +30,7 @@ const BejeweledMenu = () => {
   const [fadeOut, setFadeOut] = useState<boolean>(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState<number | null>(null);
 
   const router = useRouter();
 
@@ -137,11 +141,14 @@ const BejeweledMenu = () => {
 
   const handleClick = (path?: string) => {
     if (!path) return;
-
     setFadeOut(true);
     setTimeout(() => {
-      router.push(path);
-    }, 400); // задержка должна совпадать с CSS-анимацией
+      if (path === "/game" && userLevel !== null) {
+        router.push(`/game?level=${userLevel}`);
+      } else {
+        router.push(path);
+      }
+    }, 400);
   };
 
   // Получение имени пользователя из Telegram WebApp
@@ -170,6 +177,22 @@ const BejeweledMenu = () => {
         error instanceof Error ? error.message : String(error);
       setError(`Ошибка при инициализации: ${errorMessage}`);
     }
+  }, []);
+
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    const user = tg.initDataUnsafe?.user;
+    const fetchUserData = async (username: string) => {
+      try {
+        const response = await axios.post(`${BACK_URL}/getUserInf`, {
+          username: username,
+        });
+        setUserLevel(response.data.user.level);
+      } catch (error) {
+        console.log("err with fetch");
+      }
+    };
+    fetchUserData(user.username);
   }, []);
 
   return (

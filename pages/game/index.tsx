@@ -39,6 +39,14 @@ interface TouchStart {
   time: number;
 }
 
+interface LevelResult {
+  level: number;
+  counter: number;
+  stars: Record<string, number>;
+  additionalStars: number;
+  earnedStars: number;
+}
+
 // Интерфейс для типизации данных пользователя Telegram
 interface TelegramWebAppUser {
   username?: string;
@@ -123,6 +131,15 @@ const GamePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isBrowser, setIsBrowser] = useState<boolean>(false);
+  const [showGameOverModal, setShowGameOverModal] = useState<boolean>(false);
+  const [levelResult, setLevelResult] = useState<LevelResult | null>(null);
+  const [showScore, setShowScore] = useState<boolean>(false);
+  const [showLevel, setShowLevel] = useState<boolean>(false);
+  const [showStars, setShowStars] = useState<number>(0);
+  const [displayScore, setDisplayScore] = useState<number>(0);
+  const [modalBackgroundGems, setModalBackgroundGems] = useState<
+    BackgroundGem[]
+  >([]);
 
   // Проверяем, находимся ли мы в браузере
   useEffect(() => {
@@ -204,6 +221,81 @@ const GamePage: React.FC = () => {
   useEffect(() => {
     scoreRef.current = score; // Обновляем ref при каждом изменении score
   }, [score]);
+
+  useEffect(() => {
+    if (showGameOverModal && levelResult) {
+      setShowScore(true);
+      let currentScore = 0;
+      const targetScore = score;
+      const duration = 2000; // 2 seconds
+      const increment = targetScore / (duration / 50); // Update every 50ms
+
+      const scoreInterval = setInterval(() => {
+        currentScore += increment;
+        if (currentScore >= targetScore) {
+          currentScore = targetScore;
+          clearInterval(scoreInterval);
+          setShowLevel(true);
+          setTimeout(() => {
+            let starCount = 0;
+            const starInterval = setInterval(() => {
+              starCount += 1;
+              setShowStars(starCount);
+              if (starCount >= levelResult.earnedStars) {
+                clearInterval(starInterval);
+              }
+            }, 500); // 500ms delay between stars
+          }, 500); // Delay before showing stars
+        }
+        setDisplayScore(Math.floor(currentScore));
+      }, 50);
+
+      return () => clearInterval(scoreInterval);
+    }
+  }, [showGameOverModal, levelResult, score]);
+
+  useEffect(() => {
+    if (showGameOverModal) {
+      const isMobile = window.innerWidth < 768;
+      const gemCount = isMobile ? 5 : 10; // Fewer gems on mobile
+      const gems = Array.from({ length: gemCount }, (_, i) =>
+        createBackgroundGem(i)
+      );
+      setModalBackgroundGems(gems);
+    }
+  }, [showGameOverModal]);
+
+  useEffect(() => {
+    if (showGameOverModal && modalBackgroundGems.length > 0) {
+      let lastTime = 0;
+      const animate = (timestamp: number) => {
+        if (timestamp - lastTime > 33) {
+          // ~30 FPS
+          lastTime = timestamp;
+          setModalBackgroundGems((prevGems) =>
+            prevGems.map((gem) => {
+              const newY = gem.y + gem.speed;
+              if (newY > window.innerHeight) {
+                return createBackgroundGem(parseInt(gem.id.split("-")[2]));
+              }
+              return {
+                ...gem,
+                y: newY,
+                rotate: gem.rotate + gem.rotateSpeed,
+              };
+            })
+          );
+        }
+        bgAnimationRef.current = requestAnimationFrame(animate);
+      };
+      bgAnimationRef.current = requestAnimationFrame(animate);
+      return () => {
+        if (bgAnimationRef.current) {
+          cancelAnimationFrame(bgAnimationRef.current);
+        }
+      };
+    }
+  }, [showGameOverModal, modalBackgroundGems]);
 
   // Инициализация игры
   useEffect(() => {
@@ -816,8 +908,9 @@ const GamePage: React.FC = () => {
       );
 
       if (response.status === 200) {
+        setLevelResult(response.data.user); // Store the response data
         setResultSent(true);
-        setTimeout(() => router.push("/menu"), 500);
+        setShowGameOverModal(true); // Show the game over modal
       } else {
         throw new Error(`Сервер вернул статус: ${response.status}`);
       }
@@ -825,11 +918,9 @@ const GamePage: React.FC = () => {
       console.error("Ошибка при отправке результатов:", error);
 
       let errorMessage = "Произошла ошибка при сохранении результатов";
-
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-
       if (axios.isAxiosError(error)) {
         errorMessage = error.response?.data?.message || error.message;
       }
@@ -1028,6 +1119,35 @@ const GamePage: React.FC = () => {
             transform: translate3d(4px, 0, 0);
           }
         }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes popIn {
+          0% {
+            transform: scale(0);
+            opacity: 0;
+          }
+          80% {
+            transform: scale(1.2);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+        .animate-pop-in {
+          animation: popIn 0.3s ease-out;
+        }
       `}</style>
       {/* Фоновые кристаллы */}
       <div className="absolute inset-0 z-0 overflow-hidden">
@@ -1058,14 +1178,82 @@ const GamePage: React.FC = () => {
           </div>
         ))}
       </div>
-      {sendingResults && (
+      {sendingResults && !showGameOverModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-lg">
-            {resultSent ? (
-              <p>Results saved! Redirecting...</p>
-            ) : (
-              <p>Saving your results...</p>
-            )}
+            <p>Saving your results...</p>
+          </div>
+        </div>
+      )}
+      {showGameOverModal && levelResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 bg-gradient-to-b from-gray-400 to-gray-800">
+          <div className="relative bg-gradient-to-b from-gray-800 to-gray-900 p-6 rounded-lg shadow-xl text-white max-w-sm w-full animate-fade-in">
+            {/* Falling Gems Background */}
+            <div className="absolute inset-0 z-0 overflow-hidden">
+              {modalBackgroundGems.map((gem) => (
+                <div
+                  key={gem.id}
+                  className="absolute"
+                  style={{
+                    left: gem.x + "px",
+                    top: gem.y + "px",
+                    width: gem.size + "px",
+                    height: gem.size + "px",
+                    transform: `rotate(${gem.rotate}deg)`,
+                    transition: "transform 0.1s linear",
+                    opacity: 0.2,
+                  }}
+                >
+                  <img
+                    src={gemImages[gem.type]}
+                    alt="Gem"
+                    className="w-full h-full object-contain"
+                    style={{
+                      filter: `drop-shadow(0 0 5px ${gemColors[gem.type]})`,
+                      backgroundColor: gemColors[gem.type],
+                      borderRadius: "8px",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            {/* Modal Content */}
+            <div className="relative z-10">
+              <h2 className="text-2xl font-bold mb-6 text-center">
+                Game Over!
+              </h2>
+              {showScore && (
+                <p className="text-lg mb-4 text-center animate-pop-in">
+                  Score: <span className="text-yellow-400">{displayScore}</span>
+                </p>
+              )}
+              {showLevel && (
+                <p className="text-lg mb-4 text-center animate-pop-in">
+                  {levelResult.earnedStars >= 1 &&
+                  Number(router.query.level) === levelResult.level - 1 ? (
+                    <span className="text-green-400">
+                      Advanced to Level {levelResult.level}!
+                    </span>
+                  ) : (
+                    <span>Level {levelResult.level}</span>
+                  )}
+                </p>
+              )}
+              {showStars > 0 && (
+                <p className="text-lg mb-6 text-center animate-pop-in">
+                  Stars Earned:{" "}
+                  <span className="text-yellow-400">
+                    {"⭐".repeat(showStars)}
+                  </span>
+                </p>
+              )}
+              <button
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors"
+                onClick={() => router.push("/menu")}
+              >
+                Back to Menu
+              </button>
+            </div>
           </div>
         </div>
       )}
