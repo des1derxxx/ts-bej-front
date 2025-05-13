@@ -4,6 +4,7 @@ import "@mantine/core/styles.css";
 import { createTheme, MantineProvider } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { requestFullscreenMode } from "@/utils/telegram";
+import { useRouter } from "next/router";
 
 // Create a theme that respects Telegram's theme colors
 const createTelegramTheme = (tg: any) => {
@@ -11,7 +12,6 @@ const createTelegramTheme = (tg: any) => {
 
   return createTheme({
     colors: {
-      // You can use Telegram's theme colors to create a matching experience
       primary: [
         params.button_color || "#2AABEE",
         params.button_color || "#2AABEE",
@@ -32,6 +32,7 @@ const createTelegramTheme = (tg: any) => {
 export default function App({ Component, pageProps }: AppProps) {
   const [theme, setTheme] = useState(createTheme({}));
   const [telegramReady, setTelegramReady] = useState(false);
+  const router = useRouter();
 
   // Initialize Telegram WebApp
   useEffect(() => {
@@ -39,19 +40,19 @@ export default function App({ Component, pageProps }: AppProps) {
     if (typeof window !== "undefined" && window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
 
-      // Request fullscreen mode using proper method based on platform
-      if (tg.requestFullscreen) {
-        // Используем прямой метод если он доступен
-        tg.requestFullscreen();
-      } else {
-        // Используем универсальный метод через SDK или напрямую через postEvent
-        requestFullscreenMode();
+      // Request fullscreen mode only if not on /admins route
+      if (!router.pathname.startsWith("/admins")) {
+        if (tg.requestFullscreen) {
+          tg.requestFullscreen();
+        } else {
+          requestFullscreenMode();
+        }
       }
 
       // Раскрываем приложение на максимальную высоту
       tg.expand();
 
-      // Включаем подтверждение закрытия (предотвращает закрытие свайпом)
+      // Включаем подтверждение закрытия
       tg.enableClosingConfirmation();
 
       // Create a theme based on Telegram colors
@@ -70,7 +71,7 @@ export default function App({ Component, pageProps }: AppProps) {
         tg.offEvent("viewportChanged", () => {});
       };
     }
-  }, []);
+  }, [router.pathname]);
 
   return (
     <MantineProvider theme={theme}>
