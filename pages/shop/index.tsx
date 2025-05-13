@@ -55,7 +55,7 @@ const Shop = () => {
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Define backUrl for API calls
-  const backUrl = "https://des1derx-back.serveo.net"; // Adjust this based on your backend URL
+  const backUrl = process.env.NEXT_PUBLIC_BACK_URL;
 
   // Items for shop
   const shopItems = [
