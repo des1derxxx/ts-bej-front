@@ -57,23 +57,19 @@ const GalaxyLevels = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Конфигурация галактики
   const galaxyConfig: GalaxyConfig = {
     systems: 5,
     planetsPerSystem: 10,
   };
 
-  // Fetch user data when component mounts
   useEffect(() => {
     const fetchUserData = async (): Promise<void> => {
       try {
-        // Get user data from Telegram WebApp
         const tg = (window as any).Telegram?.WebApp;
 
         if (!tg || !tg.initDataUnsafe?.user?.username) {
           console.error("Telegram WebApp user not found");
 
-          // Fallback for development or when Telegram WebApp is not available
           setUserData({
             username: "testuser",
             level: 15,
@@ -106,7 +102,6 @@ const GalaxyLevels = () => {
               ? apiError.response?.data?.message || apiError.message
               : "Неизвестная ошибка при получении данных пользователя";
 
-          // Try alternative endpoint as fallback
           try {
             const altResponse = await axios.post<{ user: UserData }>(
               `${BACK_URL}/getUserInf`,
@@ -118,7 +113,6 @@ const GalaxyLevels = () => {
           } catch (altError) {
             console.error("Alternative API also failed:", altError);
 
-            // Create mock user data for development/testing
             setUserData({
               username: username || "testuser",
               level: 15,
@@ -151,7 +145,6 @@ const GalaxyLevels = () => {
     fetchUserData();
   }, []);
 
-  // Calculate unlocked systems and planets based on user level
   const calculateUnlockedContent = (userLevel: number): UnlockedContent => {
     const unlockedSystems = Math.min(
       Math.ceil(userLevel / 10),
@@ -178,7 +171,6 @@ const GalaxyLevels = () => {
     return { unlockedSystems, unlockedPlanets };
   };
 
-  // Генерация данных об уровнях с учетом прогресса пользователя
   const generateGalaxy = (userData: UserData): GalaxySystem[] => {
     const { unlockedSystems, unlockedPlanets } = calculateUnlockedContent(
       userData.level
@@ -241,7 +233,6 @@ const GalaxyLevels = () => {
     return galaxy;
   };
 
-  // Use effect to load galaxy data
   useEffect(() => {
     if (userData) {
       const galaxyData = generateGalaxy(userData);
@@ -266,7 +257,6 @@ const GalaxyLevels = () => {
     setIsZoomed(false);
   };
 
-  // Styles for planets
   const getPlanetStyle = (planet: Planet): string => {
     const base =
       "w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center text-2xl md:text-3xl shadow-xl transition-all duration-500";
@@ -294,7 +284,6 @@ const GalaxyLevels = () => {
     }
   };
 
-  // Animation for orbits
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -302,7 +291,6 @@ const GalaxyLevels = () => {
     };
   }, []);
 
-  // Early return with loading state
   if (loading) {
     return (
       <div className="w-full h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
@@ -311,7 +299,6 @@ const GalaxyLevels = () => {
     );
   }
 
-  // Return if no user data or galaxy
   if (!userData || !galaxy.length) {
     return (
       <div className="w-full h-screen bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center">
@@ -329,12 +316,10 @@ const GalaxyLevels = () => {
     );
   }
 
-  // Get current system data
   const currentSystemData = galaxy[currentSystem - 1];
 
   return (
     <div className="relative w-full h-screen bg-gradient-to-br from-gray-900 to-black overflow-hidden flex flex-col">
-      {/* Фоновые звезды */}
       <div className="absolute inset-0">
         {[...Array(100)].map((_, i) => (
           <div
@@ -485,7 +470,6 @@ const GalaxyLevels = () => {
         </div>
       </div>
 
-      {/* Глобальные стили анимаций */}
       <style jsx global>{`
         @keyframes twinkle {
           0% {

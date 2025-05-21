@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
 import axios, { AxiosError } from "axios";
 
-// Интерфейсы для типизации
 interface BackgroundGem {
   id: string;
   x: number;
@@ -47,7 +46,6 @@ interface LevelResult {
   earnedStars: number;
 }
 
-// Интерфейс для типизации данных пользователя Telegram
 interface TelegramWebAppUser {
   username?: string;
   first_name?: string;
@@ -56,7 +54,6 @@ interface TelegramWebAppUser {
 
 const BACK_URL = process.env.NEXT_PUBLIC_BACK_URL;
 
-// Функция для безопасного получения данных пользователя из Telegram WebApp
 const getTelegramUser = () => {
   try {
     const webApp = (window as any).Telegram?.WebApp;
@@ -141,12 +138,10 @@ const GamePage: React.FC = () => {
     BackgroundGem[]
   >([]);
 
-  // Проверяем, находимся ли мы в браузере
   useEffect(() => {
     setIsBrowser(typeof window !== "undefined");
   }, []);
 
-  // Функция для получения информации о пользователе
   const fetchUserInfo = async (username: string) => {
     try {
       setLoading(true);
@@ -157,7 +152,6 @@ const GamePage: React.FC = () => {
       });
 
       if (response.data && response.data.user) {
-        // Обновляем состояние игры на основе полученных данных
         setBombsLeft(response.data.user.bombs || 100);
         setMixesLeft(response.data.user.mix || 3);
         setDebugInfo(
@@ -178,7 +172,6 @@ const GamePage: React.FC = () => {
     }
   };
 
-  // Типизированные константы
   const gemTypes: GemType[] = [
     { type: "red", image: "/img/avalanche.png" },
     { type: "blue", image: "/img/eth.png" },
@@ -209,7 +202,6 @@ const GamePage: React.FC = () => {
     orange: "#fb923c",
   };
 
-  // Добавление типов для переменных
   let positions: { row: number; col: number }[] = [];
 
   useEffect(() => {
@@ -219,7 +211,7 @@ const GamePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    scoreRef.current = score; // Обновляем ref при каждом изменении score
+    scoreRef.current = score;
   }, [score]);
 
   useEffect(() => {
@@ -257,7 +249,7 @@ const GamePage: React.FC = () => {
   useEffect(() => {
     if (showGameOverModal) {
       const isMobile = window.innerWidth < 768;
-      const gemCount = isMobile ? 5 : 10; // Fewer gems on mobile
+      const gemCount = isMobile ? 5 : 10;
       const gems = Array.from({ length: gemCount }, (_, i) =>
         createBackgroundGem(i)
       );
@@ -297,7 +289,6 @@ const GamePage: React.FC = () => {
     }
   }, [showGameOverModal, modalBackgroundGems]);
 
-  // Инициализация игры
   useEffect(() => {
     initializeGrid();
     initializeBackgroundGems();
@@ -310,7 +301,6 @@ const GamePage: React.FC = () => {
     };
   }, []);
 
-  // Update cell size based on screen width
   const updateCellSize = () => {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
@@ -323,12 +313,10 @@ const GamePage: React.FC = () => {
     setCellSize(Math.max(32, Math.min(56, maxCellSize)));
   };
 
-  // Инициализация фоновых падающих кристаллов
   const initializeBackgroundGems = () => {
     const isClient = typeof window !== "undefined";
     if (!isClient) return;
 
-    // Уменьшаем количество фоновых гемов на мобильных устройствах
     const isMobile = window.innerWidth < 768;
     const gemCount = isMobile ? 5 : 10;
 
@@ -339,9 +327,7 @@ const GamePage: React.FC = () => {
 
     let lastTime = 0;
     const animate = (timestamp: number) => {
-      // Ограничиваем частоту обновлений до ~30 FPS для экономии ресурсов
       if (timestamp - lastTime > 33) {
-        // примерно 30 fps
         lastTime = timestamp;
 
         setBackgroundGems((prevGems) => {
@@ -371,7 +357,6 @@ const GamePage: React.FC = () => {
     };
   };
 
-  // Единая обработка таймера
   useEffect(() => {
     const tick = () => {
       setTimeLeft((prev) => {
@@ -426,19 +411,16 @@ const GamePage: React.FC = () => {
       setDraggedGem(gem);
       setIsDragging(true);
 
-      // Получаем начальные координаты
       let clientX, clientY;
       if ("touches" in event) {
         clientX = event.touches[0].clientX;
         clientY = event.touches[0].clientY;
-        // Для мобилок сохраняем начальную точку касания
         touchStartRef.current = { x: clientX, y: clientY, time: Date.now() };
       } else {
         clientX = event.clientX;
         clientY = event.clientY;
       }
 
-      // Вычисляем смещение относительно центра гема
       if (gridRef.current) {
         const gridRect = gridRef.current.getBoundingClientRect();
         const gemX = gridRect.left + col * cellSize + cellSize / 2;
@@ -450,13 +432,11 @@ const GamePage: React.FC = () => {
         setDragPosition({ x: clientX, y: clientY });
       }
 
-      // Предотвращаем стандартное поведение
       event.preventDefault();
     },
     [grid, isSwapping, isMixing, bombSelected, cellSize, gameOver]
   );
 
-  // Обработка перемещения (для ПК и мобилок)
   const handleDragMove = useCallback(
     (event: MouseEvent | TouchEvent) => {
       if (!isDragging || !draggedGem) return;
@@ -472,7 +452,6 @@ const GamePage: React.FC = () => {
 
       setDragPosition({ x: clientX, y: clientY });
 
-      // Для мобилок определяем целевой гем при перемещении
       if ("touches" in event && gridRef.current) {
         const gridRect = gridRef.current.getBoundingClientRect();
         const x = clientX - gridRect.left;
@@ -495,15 +474,12 @@ const GamePage: React.FC = () => {
     },
     [isDragging, draggedGem, cellSize, grid]
   );
-
-  // Обработка окончания перетаскивания (для ПК и мобилок)
   const handleDragEnd = useCallback(() => {
     if (!isDragging || !draggedGem) {
       setIsDragging(false);
       return;
     }
 
-    // Для мобилок - обработка свайпа
     if (touchStartRef.current) {
       const { x: startX, y: startY, time } = touchStartRef.current;
       const dx = dragPosition.x - startX;
@@ -519,9 +495,7 @@ const GamePage: React.FC = () => {
       ) {
         swapGems(draggedGem, targetGem);
       }
-    }
-    // Для ПК - проверяем, куда отпустили гем
-    else if (gridRef.current) {
+    } else if (gridRef.current) {
       const gridRect = gridRef.current.getBoundingClientRect();
       const x = dragPosition.x - gridRect.left;
       const y = dragPosition.y - gridRect.top;
@@ -539,7 +513,6 @@ const GamePage: React.FC = () => {
       }
     }
 
-    // Сброс состояния
     setDraggedGem(null);
     setTargetGem(null);
     touchStartRef.current = null;
@@ -567,7 +540,6 @@ const GamePage: React.FC = () => {
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
-  // Helper function to check if gems are adjacent
   const isAdjacent = (
     row1: number,
     col1: number,
@@ -583,55 +555,43 @@ const GamePage: React.FC = () => {
     if (isProcessing || matchedPositions.length === 0) return false;
     setIsProcessing(true);
 
-    // Create a new grid to modify
     const newGrid = [...grid];
 
-    // Mark matched gems and create explosions
     matchedPositions.forEach((posStr) => {
       const [row, col] = posStr.split("-").map(Number);
       const gemType = newGrid[row][col].type;
 
-      // Mark gem as matched
       newGrid[row][col].matched = true;
     });
 
-    // Update the grid
     setGrid(newGrid);
 
-    // Update score (100 points per matched gem)
     setScore((prevScore) => prevScore + matchedPositions.length * 100);
 
-    // After a short delay for animations, replace matched gems
     setTimeout(() => {
       replaceMatchedGems();
     }, 300);
     return true;
   };
 
-  // Обновление функций с типами
   const swapGems = (gem1: Gem, gem2: Gem) => {
     if (!isAdjacent(gem1.row, gem1.col, gem2.row, gem2.col)) return;
 
     setIsSwapping(true);
 
-    // Создаем копию сетки для изменений
     const newGrid = [...grid];
 
-    // Сохраняем исходные типы гемов на случай отката
     const originalType1 = newGrid[gem1.row][gem1.col].type;
     const originalType2 = newGrid[gem2.row][gem2.col].type;
 
-    // Меняем гемы местами
     newGrid[gem1.row][gem1.col].type = originalType2;
     newGrid[gem2.row][gem2.col].type = originalType1;
 
     setGrid(newGrid);
 
-    // Проверяем совпадения после небольшой задержки для анимации
     setTimeout(() => {
       const hasMatches = checkMatches();
 
-      // Если совпадений нет - возвращаем гемы на место
       if (!hasMatches) {
         setTimeout(() => {
           const revertedGrid = [...grid];
@@ -639,7 +599,6 @@ const GamePage: React.FC = () => {
           revertedGrid[gem2.row][gem2.col].type = originalType2;
           setGrid(revertedGrid);
 
-          // Добавляем анимацию "отказа" для визуальной обратной связи
           const gemElements = document.querySelectorAll(
             `[data-gem-id="${gem1.row}-${gem1.col}"], 
            [data-gem-id="${gem2.row}-${gem2.col}"]`
@@ -658,17 +617,13 @@ const GamePage: React.FC = () => {
     }, 300);
   };
 
-  // Функция применения бомбы
   const useBomb = (row: number, col: number) => {
     if (bombsLeft <= 0) return;
 
-    // Уменьшаем количество бомб
     setBombsLeft(bombsLeft - 1);
 
-    // Отключаем выбор бомбы
     setBombSelected(false);
 
-    // Определяем соседние кристаллы (включая центральный)
     const neighbors: Gem[] = [];
     const directions = [
       [-1, -1],
@@ -682,7 +637,6 @@ const GamePage: React.FC = () => {
       [1, 1],
     ];
 
-    // Собираем все соседние гемы, которые будут взорваны
     for (const [dr, dc] of directions) {
       const newRow = row + dr;
       const newCol = col + dc;
@@ -697,24 +651,20 @@ const GamePage: React.FC = () => {
       }
     }
 
-    // Маркируем взорванные гемы как совпадения для их последующей замены
     const newGrid = [...grid];
     neighbors.forEach((gem) => {
       newGrid[gem.row][gem.col].matched = true;
     });
 
-    // Добавляем очки за взрыв
     setScore((prev) => prev + 900);
 
     setGrid(newGrid);
 
-    // Запускаем замену взорванных гемов после задержки для анимации
     setTimeout(() => {
       replaceMatchedGems();
     }, 300);
   };
 
-  // Функция перемешивания массива
   const shuffle = (array: any[]) => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -724,7 +674,6 @@ const GamePage: React.FC = () => {
     return newArray;
   };
 
-  // Функция перемешивания сетки
   const mixGrid = () => {
     if (mixesLeft <= 0 || isMixing) return;
 
@@ -732,7 +681,6 @@ const GamePage: React.FC = () => {
     setMixesLeft(mixesLeft - 1);
     const newGrid = [...grid];
 
-    // Одномоментное обновление
     const shuffled = shuffle([...newGrid.flat().map((g) => g.type)]);
     newGrid.forEach((row, i) => {
       row.forEach((gem, j) => {
@@ -745,14 +693,11 @@ const GamePage: React.FC = () => {
   };
 
   const checkMatches = useCallback((): boolean => {
-    // Создаем копию только если нашли совпадения
     if (isProcessing) return false;
 
-    // Создаем копию только если нашли совпадения
     let matches = new Set<string>();
     let foundMatches = false;
 
-    // Проверка по строкам
     for (let row = 0; row < 8; row++) {
       let currentType: string | null = null;
       let count = 0;
@@ -781,7 +726,6 @@ const GamePage: React.FC = () => {
       }
     }
 
-    // Проверка по столбцам
     for (let col = 0; col < 8; col++) {
       let currentType: string | null = null;
       let count = 0;
@@ -818,7 +762,6 @@ const GamePage: React.FC = () => {
     return false;
   }, [grid, handleMatches, isProcessing]);
 
-  // Check for matches after a swap
   useEffect(() => {
     if (grid.length > 0 && !isMixing && !isProcessing) {
       const timer = setTimeout(() => {
@@ -831,15 +774,12 @@ const GamePage: React.FC = () => {
   const replaceMatchedGems = () => {
     const newGrid = [...grid];
 
-    // Replace matched gems with new ones
     for (let col = 0; col < 8; col++) {
       for (let row = 7; row >= 0; row--) {
         if (newGrid[row][col].matched) {
-          // Find the first non-matched gem above
           let sourceRow = row - 1;
           while (sourceRow >= 0) {
             if (!newGrid[sourceRow][col].matched) {
-              // Swap types
               newGrid[row][col].type = newGrid[sourceRow][col].type;
               newGrid[sourceRow][col].matched = true;
               break;
@@ -847,12 +787,10 @@ const GamePage: React.FC = () => {
             sourceRow--;
           }
 
-          // If no non-matched gems found above, create a new one
           if (sourceRow < 0) {
             newGrid[row][col].type = getRandomGemType();
           }
 
-          // Clear the matched flag
           newGrid[row][col].matched = false;
         }
       }
@@ -860,7 +798,6 @@ const GamePage: React.FC = () => {
 
     setGrid([...newGrid]);
 
-    // Устанавливаем флаг обработки в false после небольшой задержки
     setTimeout(() => {
       setIsProcessing(false);
     }, 300);
@@ -873,7 +810,6 @@ const GamePage: React.FC = () => {
     sendLevelResults();
   };
 
-  // Улучшенная обработка ошибок при отправке результатов
   const sendLevelResults = async (): Promise<void> => {
     const { level } = router.query;
     const levelToSend = Number(level);
@@ -908,9 +844,9 @@ const GamePage: React.FC = () => {
       );
 
       if (response.status === 200) {
-        setLevelResult(response.data.user); // Store the response data
+        setLevelResult(response.data.user);
         setResultSent(true);
-        setShowGameOverModal(true); // Show the game over modal
+        setShowGameOverModal(true);
       } else {
         throw new Error(`Сервер вернул статус: ${response.status}`);
       }
@@ -944,7 +880,6 @@ const GamePage: React.FC = () => {
 
     initializeGrid();
 
-    // Перезапуск таймера
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
@@ -969,23 +904,19 @@ const GamePage: React.FC = () => {
   };
 
   useEffect(() => {
-    // Функция для предотвращения прокрутки
     const preventDefault = (e: Event): void => {
       e.preventDefault();
     };
 
-    // Блокировка прокрутки при монтировании компонента
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
     document.body.style.width = "100%";
     document.body.style.height = "100%";
     document.body.style.touchAction = "none";
 
-    // Добавление обработчиков событий для предотвращения прокрутки
     document.addEventListener("touchmove", preventDefault, { passive: false });
     document.addEventListener("wheel", preventDefault, { passive: false });
 
-    // Очистка при размонтировании
     return () => {
       document.body.style.overflow = "";
       document.body.style.position = "";
@@ -997,7 +928,6 @@ const GamePage: React.FC = () => {
     };
   }, []);
 
-  // Улучшенная обработка событий касания
   const handleTouchMove = useCallback(
     (event: TouchEvent): void => {
       event.preventDefault();

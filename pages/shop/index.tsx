@@ -54,10 +54,8 @@ const Shop = () => {
   const [userNfts, setUserNfts] = useState<NFT[]>([]);
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Define backUrl for API calls
   const backUrl = process.env.NEXT_PUBLIC_BACK_URL;
 
-  // Items for shop
   const shopItems = [
     {
       id: 1,
@@ -85,7 +83,6 @@ const Shop = () => {
     },
   ];
 
-  // Map rarity names to Russian equivalents
   const rarityMap = {
     common: "Обычный",
     uncommon: "Необычный",
@@ -94,7 +91,6 @@ const Shop = () => {
     legendary: "Легендарный",
   };
 
-  // Map rarity to emoji icons
   const rarityIcons = {
     common: "🔹",
     uncommon: "🔷",
@@ -103,7 +99,6 @@ const Shop = () => {
     legendary: "👑",
   };
 
-  // Цвета драгоценных камней (взято из BejeweledMenu)
   const gemColors = [
     "from-red-500 to-red-700",
     "from-blue-400 to-blue-600",
@@ -114,12 +109,10 @@ const Shop = () => {
     "from-indigo-400 to-indigo-600",
   ];
 
-  // Check if we're in the browser environment
   useEffect(() => {
     setIsBrowser(true);
   }, []);
 
-  // Fetch NFTs from API
   useEffect(() => {
     const fetchNfts = async () => {
       try {
@@ -127,13 +120,11 @@ const Shop = () => {
         setNfts(response.data);
         console.log("NFTs loaded:", response.data);
 
-        // Set possible NFTs for the case
         setPossibleNfts(response.data);
       } catch (error) {
         console.error("Ошибка при загрузке NFT:", error);
         setDebugInfo(`Ошибка при загрузке NFT: ${error}`);
 
-        // For development - set some mock NFTs for the case
         setPossibleNfts([
           {
             _id: "nft1",
@@ -184,7 +175,6 @@ const Shop = () => {
     }
   }, [isBrowser, backUrl]);
 
-  // Generate falling gems once we're in the browser
   useEffect(() => {
     if (!isBrowser) return;
 
@@ -207,7 +197,6 @@ const Shop = () => {
     setGems(newGems);
   }, [isBrowser]);
 
-  // Функция для безопасного получения данных пользователя из Telegram WebApp
   const getTelegramUser = () => {
     try {
       const webApp = (window as any).Telegram?.WebApp;
@@ -250,7 +239,6 @@ const Shop = () => {
       } else {
         setDebugInfo("Telegram WebApp not available");
         setLoading(false);
-        // В режиме разработки используем тестового пользователя
         fetchUserInfo("des1derx");
       }
     } catch (error) {
@@ -262,7 +250,6 @@ const Shop = () => {
     }
   }, [isBrowser]);
 
-  // Fetch user information
   const fetchUserInfo = async (username: string) => {
     try {
       setLoading(true);
@@ -305,7 +292,6 @@ const Shop = () => {
       setError(errorMessage);
       setLoading(false);
 
-      // For development - load mock data if API fails
       setUserInfo({
         username: username,
         bombs: 3,
@@ -330,7 +316,6 @@ const Shop = () => {
     };
   }, []);
 
-  // Animation for gems falling - only in browser
   useEffect(() => {
     if (!isBrowser) return;
 
@@ -358,7 +343,6 @@ const Shop = () => {
     };
   }, [isBrowser]);
 
-  // Animation for glowing effect - only in browser
   useEffect(() => {
     if (!isBrowser) return;
 
@@ -369,17 +353,13 @@ const Shop = () => {
     return () => clearInterval(interval);
   }, [isBrowser]);
 
-  // Case opening animation effect
   useEffect(() => {
     if (!showCaseOpening) return;
 
     if (caseAnimationStage === 1) {
-      // Start the spinning animation
       const spinDuration = 3000; // 3 seconds
 
-      // After spinDuration, show the result
       const spinTimer = setTimeout(() => {
-        // Select a random NFT from possible NFTs
         const randomIndex = Math.floor(Math.random() * possibleNfts.length);
         setSelectedNft(possibleNfts[randomIndex]);
         setCaseAnimationStage(2);
@@ -389,7 +369,6 @@ const Shop = () => {
     }
 
     if (caseAnimationStage === 2) {
-      // Show the result for 2 seconds, then close
       const resultTimer = setTimeout(() => {
         closeCase();
       }, 3000);
@@ -509,7 +488,6 @@ const Shop = () => {
     setScrollingNfts([]);
   };
 
-  // Get rarity color class based on rarity
   const getRarityColorClass = (rarity?: string): string => {
     switch (rarity?.toLowerCase()) {
       case "common":
@@ -527,7 +505,6 @@ const Shop = () => {
     }
   };
 
-  // Get rarity text color class based on rarity
   const getRarityTextColorClass = (rarity?: string): string => {
     switch (rarity?.toLowerCase()) {
       case "common":
@@ -561,7 +538,6 @@ const Shop = () => {
     }
   };
 
-  // Обработчики событий для изображений
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.currentTarget;
     target.onerror = null;
@@ -574,21 +550,18 @@ const Shop = () => {
     target.src = "/api/placeholder/128/128";
   };
 
-  // Типизированная функция для получения иконки редкости
   const getRarityIcon = (rarity: string | undefined): string => {
     if (!rarity) return "💎";
     const normalizedRarity = rarity.toLowerCase() as keyof typeof rarityIcons;
     return rarityIcons[normalizedRarity] || "💎";
   };
 
-  // Типизированная функция для получения названия редкости
   const getRarityName = (rarity: string | undefined): string => {
     if (!rarity) return "Неизвестно";
     const normalizedRarity = rarity.toLowerCase() as keyof typeof rarityMap;
     return rarityMap[normalizedRarity] || rarity;
   };
 
-  // Форматирование даты
   const formatDate = (date: string | undefined): string => {
     if (!date) return "Нет данных";
     return new Date(date).toLocaleDateString();

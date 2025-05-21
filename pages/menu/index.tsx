@@ -34,7 +34,6 @@ const BejeweledMenu = () => {
 
   const router = useRouter();
 
-  // Цвета драгоценных камней
   const gemColors = [
     "from-red-500 to-red-700",
     "from-blue-400 to-blue-600",
@@ -45,25 +44,20 @@ const BejeweledMenu = () => {
     "from-indigo-400 to-indigo-600",
   ];
 
-  // Предотвращение прокрутки
   useEffect(() => {
-    // Функция для предотвращения прокрутки
     const preventDefault = (e: Event) => {
       e.preventDefault();
     };
 
-    // Блокировка прокрутки при монтировании компонента
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
     document.body.style.width = "100%";
     document.body.style.height = "100%";
     document.body.style.touchAction = "none";
 
-    // Добавление обработчиков событий для предотвращения прокрутки
     document.addEventListener("touchmove", preventDefault, { passive: false });
     document.addEventListener("wheel", preventDefault, { passive: false });
 
-    // Очистка при размонтировании
     return () => {
       document.body.style.overflow = "";
       document.body.style.position = "";
@@ -75,7 +69,6 @@ const BejeweledMenu = () => {
     };
   }, []);
 
-  // Создаем фоновую анимацию с падающими камнями
   useEffect(() => {
     const createGems = () => {
       const newGems: Gem[] = [];
@@ -96,7 +89,6 @@ const BejeweledMenu = () => {
 
     createGems();
 
-    // Анимация падения камней
     const animationInterval = setInterval(() => {
       setGems((prevGems) =>
         prevGems.map((gem) => {
@@ -122,14 +114,13 @@ const BejeweledMenu = () => {
   }, []);
 
   const menuOptions: MenuOption[] = [
-    { id: "play", label: "Играть", icon: "▶️", path: "/game" },
+    { id: "play", label: "ИгратьЕ", icon: "▶️", path: "/game" },
     { id: "levels", label: "Уровни", icon: "🎮", path: "/levels" },
     { id: "shop", label: "Магазин", icon: "🛒", path: "/shop" },
     { id: "awards", label: "Награды", icon: "⚙️", path: "/awards" },
     //{ id: "leaderboard", label: "Рекорды", icon: "🏆" },
   ];
 
-  // Эффект мерцания для кнопок
   const [glowIntensity, setGlowIntensity] = useState<number>(0);
   useEffect(() => {
     const glowInterval = setInterval(() => {
@@ -151,13 +142,10 @@ const BejeweledMenu = () => {
     }, 400);
   };
 
-  // Получение имени пользователя из Telegram WebApp
   useEffect(() => {
     try {
-      // Убедимся, что объект Telegram WebApp доступен
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
-        // Отключаем вертикальные свайпы для предотвращения закрытия и прокрутки
         if (typeof tg.disableVerticalSwipes === "function") {
           tg.disableVerticalSwipes();
         }
@@ -200,7 +188,6 @@ const BejeweledMenu = () => {
       {fadeOut && (
         <div className="absolute inset-0 bg-black opacity-0 animate-fadeOut z-50 pointer-events-none" />
       )}
-      {/* Анимированные драгоценные камни на фоне */}
       {gems.map((gem) => (
         <div
           key={gem.id}
@@ -216,17 +203,13 @@ const BejeweledMenu = () => {
         />
       ))}
 
-      {/* Область контента */}
       <div className="relative h-full flex flex-col items-center justify-between py-12 z-10">
-        {/* Логотип игры */}
         <div className="mt-6 mb-12 text-center">
           <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-300 drop-shadow-lg">
             BEJEWELED {userName ? `- Привет, ${userName}` : ""}
           </h1>
           {error && <p className="text-red-400 mt-2 text-sm">{error}</p>}
         </div>
-
-        {/* Меню опций */}
         <div className="flex flex-col w-4/5 max-w-sm gap-4">
           {menuOptions.map((option) => (
             <button
@@ -256,7 +239,6 @@ const BejeweledMenu = () => {
           ))}
         </div>
 
-        {/* Нижняя информация */}
         <div className="mt-auto mb-6 flex flex-col items-center text-center">
           <div className="flex items-center gap-2 mb-2"></div>
         </div>
